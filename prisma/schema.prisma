@@ -1,0 +1,19 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Spot {
+  id        Int      @id @default(autoincrement())
+  place     String
+  bloom     Int
+  weather   String
+  comment   String?
+  imageUrl  String?
+  imageHash String?  @unique  // ★同じ画像の多重投稿防止（nullは複数OK）
+  createdAt DateTime @default(now())
+}

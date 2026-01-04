@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///Users/nematakuya/hanami-mvp/src/app/layout.tsx"],"sourcesContent":["// src/app/layout.tsx\nimport type { Metadata } from \"next\";\nimport \"./globals.css\";\n\nexport const metadata: Metadata = {\n  title: \"Hanami Check\",\n  icons: {\n    icon: \"/image.png\", // public/image.png を参照（先頭スラッシュ必須）\n  },\n};\n\nexport default function RootLayout({\n  children,\n}: {\n  children: React.ReactNode;\n}) {\n  return (\n    <html lang=\"ja\">\n      <body>{children}</body>\n    </html>\n  );\n}"],"names":[],"mappings":"AAAA,qBAAqB;;;;;;;;;;AAId,MAAM,WAAqB;IAChC,OAAO;IACP,OAAO;QACL,MAAM;IACR;AACF;AAEe,SAAS,WAAW,EACjC,QAAQ,EAGT;IACC,qBACE,8OAAC;QAAK,MAAK;kBACT,cAAA,8OAAC;sBAAM;;;;;;;;;;;AAGb"}},
+    {"offset": {"line": 40, "column": 0}, "map": {"version":3,"sources":["file:///Users/nematakuya/hanami-mvp/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = (\n  require('../../module.compiled') as typeof import('../../module.compiled')\n).vendored['react-rsc']!.ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":"AAAAA,OAAOC,OAAO,GACZC,QAAQ,4HACRC,QAAQ,CAAC,YAAY,CAAEC,kBAAkB","ignoreList":[0]}}]
+}
