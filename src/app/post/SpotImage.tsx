@@ -1,49 +1,73 @@
-{/* 写真アップロード（imageUrl手入力は削除） */}
-<div className="space-y-2">
-  <label className="text-xs font-semibold text-neutral-700">
-    写真（任意）
-  </label>
+"use client";
 
-  <input
-    type="file"
-    accept="image/*"
-    className="block w-full text-sm"
-    onChange={async (e) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+import { useState } from "react";
 
-      try {
-        setUploading(true);
+type Props = {
+  onUploaded?: (imageUrl: string) => void;
+};
 
-        const fd = new FormData();
-        fd.append("file", file);
+export default function SpotImage({ onUploaded }: Props) {
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-        const res = await fetch("/api/upload", {
-          method: "POST",
-          body: fd,
-        });
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setFile(e.target.files[0]);
+  };
 
-        const data = await res.json();
-        if (!res.ok || !data?.ok) {
-          throw new Error(data?.error ?? "upload failed");
-        }
+  const handleUpload = async () => {
+    if (!file) return;
 
-        setImageUrl(data.url); // ← これが /uploads/xxx.jpg になる想定
-      } catch (err: any) {
-        alert(err?.message ?? "upload failed");
-      } finally {
-        setUploading(false);
+    setUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("アップロードに失敗しました");
       }
-    }}
-  />
 
-  {uploading ? (
-    <p className="text-xs text-neutral-500">アップロード中...</p>
-  ) : imageUrl ? (
-    <p className="text-xs text-neutral-500">
-      アップロード済み
-    </p>
-  ) : (
-    <p className="text-xs text-neutral-400">未選択</p>
-  )}
-</div>
+      const data = await res.json();
+
+      // 親コンポーネントに画像URLを渡す（任意）
+      if (onUploaded) {
+        onUploaded(data.imageUrl);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "不明なエラー");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+      />
+
+      <button
+        type="button"
+        onClick={handleUpload}
+        disabled={!file || uploading}
+        className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+      >
+        {uploading ? "アップロード中..." : "画像をアップロード"}
+      </button>
+
+      {error && (
+        <p className="text-sm text-red-500">{error}</p>
+      )}
+    </div>
+  );
+}
