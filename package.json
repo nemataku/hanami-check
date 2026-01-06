@@ -4,14 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@prisma/adapter-better-sqlite3": "^7.2.0",
     "@prisma/client": "^5.22.0",
-    "better-sqlite3": "^12.5.0",
     "browser-image-compression": "^2.0.2",
     "heic-convert": "^2.1.0",
     "heic2any": "^0.0.4",
@@ -23,7 +22,6 @@
     "sharp": "^0.34.5"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
