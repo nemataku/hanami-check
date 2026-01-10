@@ -1,83 +1,117 @@
-// src/app/api/upload/route.ts
-import { NextResponse } from "next/server";
-import crypto from "crypto";
-import sharp from "sharp";
-import { put } from "@vercel/blob";
+"use client";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
+import { useState } from "react";
 
-// 出力の目安（好みで調整OK）
-const OUT_MAX_WIDTH = 1920;
-const OUT_QUALITY_JPG = 82;
+export default function SpotForm() {
+  const [comment, setComment] = useState("");
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-// 入力サイズ制限（サーバー保護）
-const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB（目標）
+  const handleImageChange = (file: File | null) => {
+    setImageFile(file);
+    setError(null);
 
-function sha256(buf: Buffer) {
-  return crypto.createHash("sha256").update(buf).digest("hex");
-}
-
-export async function POST(req: Request) {
-  try {
-    const form = await req.formData();
-    const file = form.get("file");
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ ok: false, error: "file が見つかりません" }, { status: 400 });
+    if (file) {
+      setImagePreview(URL.createObjectURL(file));
+    } else {
+      setImagePreview(null);
     }
+  };
 
-    if (file.size <= 0) {
-      return NextResponse.json({ ok: false, error: "空ファイルです" }, { status: 400 });
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      let imageUrl: string | null = null;
+
+      // ① 画像がある場合だけ upload API を呼ぶ
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append("file", imageFile);
+
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: fd,
+        });
+
+        const json = await res.json();
+        if (!json.ok) throw new Error("画像アップロード失敗");
+
+        imageUrl = json.imageUrl;
+      }
+
+      // ② spots API に投稿
+      const res2 = await fetch("/api/spots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          comment,
+          imageUrl, // ← null でもOK
+        }),
+      });
+
+      if (!res2.ok) throw new Error("投稿に失敗しました");
+
+      // 成功時リセット
+      setComment("");
+      handleImageChange(null);
+      alert("投稿しました");
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
     }
-    if (file.size > MAX_INPUT_BYTES) {
-      return NextResponse.json({ ok: false, error: "ファイルが大きすぎます（10MBまで）" }, { status: 413 });
-    }
+  };
 
-    const arrayBuffer = await file.arrayBuffer();
-    const inputBuf = Buffer.from(arrayBuffer);
+  return (
+    <div className="space-y-4">
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="例：かなり混雑、5分咲き"
+        className="w-full border rounded p-2"
+      />
 
-    // 画像処理（リサイズ＋圧縮）: 何が来ても JPEG に寄せる
-    let out = await sharp(inputBuf)
-      .rotate()
-      .resize({ width: OUT_MAX_WIDTH, withoutEnlargement: true })
-      .jpeg({ quality: OUT_QUALITY_JPG })
-      .toBuffer();
+      {/* 画像 */}
+      <div>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={(e) => handleImageChange(e.target.files?.[0] ?? null)}
+        />
 
-    // 大きい場合は段階的に落とす
-    if (out.length > MAX_OUTPUT_BYTES) {
-      out = await sharp(inputBuf)
-        .rotate()
-        .resize({ width: 1600, withoutEnlargement: true })
-        .jpeg({ quality: 75 })
-        .toBuffer();
-    }
-    if (out.length > MAX_OUTPUT_BYTES) {
-      out = await sharp(inputBuf)
-        .rotate()
-        .resize({ width: 1280, withoutEnlargement: true })
-        .jpeg({ quality: 68 })
-        .toBuffer();
-    }
+        {imagePreview && (
+          <div className="mt-2 space-y-2">
+            <img src={imagePreview} className="max-h-40 rounded" />
+            <button
+              className="text-sm text-red-500"
+              onClick={() => handleImageChange(null)}
+            >
+              画像をキャンセル
+            </button>
+          </div>
+        )}
+      </div>
 
-    const hash = sha256(out);
-    const outName = `${Date.now()}_${hash.slice(0, 12)}.jpg`;
+      {error && <p className="text-red-500 text-sm">{error}</p>}
 
-    // Vercel Blob に保存（publicアクセス）
-    const blob = await put(`uploads/${outName}`, out, {
-      access: "public",
-      contentType: "image/jpeg",
-    });
+      <button
+        disabled={loading}
+        onClick={handleSubmit}
+        className="w-full bg-black text-white py-2 rounded disabled:opacity-50"
+      >
+        {loading ? "送信中..." : "投稿する"}
+      </button>
 
-    return NextResponse.json({
-      ok: true,
-      imageUrl: blob.url, // ← ここが「/uploads/..」ではなく外部URLになる
-      imageHash: hash,
-      bytes: out.length,
-    });
-  } catch (e) {
-    console.error(e);
-    return NextResponse.json({ ok: false, error: "アップロードに失敗しました" }, { status: 500 });
-  }
+      <button
+        onClick={() => history.back()}
+        className="w-full border py-2 rounded"
+      >
+        TOPに戻る
+      </button>
+    </div>
+  );
 }
