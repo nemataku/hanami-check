@@ -1,96 +1,84 @@
 // src/app/api/spots/route.ts
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 
-const prisma = new PrismaClient();
-
-export const runtime = "nodejs";
-
-// 公開前の最低限ガード（UIと合わせて調整OK）
-const MAX_PLACE_LEN = 60;
-const MAX_COMMENT_LEN = 200;
-
-// ここは UI 側と合わせる（将来 options を増やすなら更新）
-const ALLOWED_WEATHER = new Set(["晴れ", "曇り", "小雨", "雨", "雪"]);
+export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const place = (searchParams.get("place") ?? "").trim();
 
-    if (!place) {
-      return NextResponse.json({ ok: false, error: "place is required" }, { status: 400 });
-    }
-    if (place.length > MAX_PLACE_LEN) {
-      return NextResponse.json({ ok: false, error: "place is too long" }, { status: 400 });
-    }
-
+    // place指定があれば最新5件、なければ最新20件（好みで調整OK）
     const items = await prisma.spot.findMany({
-      where: { place },
+      where: place
+        ? {
+            place: {
+              contains: place,
+              mode: "insensitive", // 大文字小文字無視（Postgresで有効）
+            },
+          }
+        : undefined,
       orderBy: { createdAt: "desc" },
-      take: 5,
+      take: place ? 5 : 20,
     });
 
     return NextResponse.json({ ok: true, items });
-  } catch {
-    return NextResponse.json({ ok: false, error: "search failed" }, { status: 500 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { ok: false, error: "取得に失敗しました" },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => null);
+    const body = await req.json();
 
-    const place = (body?.place ?? "").trim();
-    const bloom = Number(body?.bloom);
-    const weather = String(body?.weather ?? "");
-    const comment = body?.comment ? String(body.comment) : null;
-    const imageUrl = body?.imageUrl ? String(body.imageUrl) : null;
-    const imageHash = body?.imageHash ? String(body.imageHash) : null;
+    const place = String(body.place ?? "").trim();
+    const bloom = Number(body.bloom);
+    const weather = body.weather == null ? null : String(body.weather);
+
+    const comment =
+      body.comment == null || String(body.comment).trim() === ""
+        ? null
+        : String(body.comment).trim();
+
+    const imageUrl = body.imageUrl == null ? null : String(body.imageUrl);
+    const imageHash = body.imageHash == null ? null : String(body.imageHash);
 
     if (!place) {
-      return NextResponse.json({ ok: false, error: "place is required" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "place は必須です" },
+        { status: 400 }
+      );
     }
-    if (place.length > MAX_PLACE_LEN) {
-      return NextResponse.json({ ok: false, error: "place is too long" }, { status: 400 });
-    }
-
     if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) {
-      return NextResponse.json({ ok: false, error: "bloom is invalid" }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, error: "bloom が不正です" },
+        { status: 400 }
+      );
     }
 
-    if (!weather) {
-      return NextResponse.json({ ok: false, error: "weather is required" }, { status: 400 });
-    }
-    if (!ALLOWED_WEATHER.has(weather)) {
-      return NextResponse.json({ ok: false, error: "weather is invalid" }, { status: 400 });
-    }
+    const created = await prisma.spot.create({
+      data: {
+        place,
+        bloom,
+        weather,
+        comment,
+        imageUrl,
+        imageHash,
+      },
+    });
 
-    if (comment && comment.length > MAX_COMMENT_LEN) {
-      return NextResponse.json({ ok: false, error: "comment is too long" }, { status: 400 });
-    }
-
-    // 画像URL/Hash が入ってくる場合の軽い整合チェック（SpotForm 側が保証しているが保険）
-    if ((imageUrl && !imageHash) || (!imageUrl && imageHash)) {
-      return NextResponse.json({ ok: false, error: "image fields are invalid" }, { status: 400 });
-    }
-
-    try {
-      const created = await prisma.spot.create({
-        data: { place, bloom, weather, comment, imageUrl, imageHash },
-      });
-      return NextResponse.json({ ok: true, item: created });
-    } catch (e: any) {
-      // 同一画像の多重投稿（imageHash UNIQUE）を分かりやすく
-      if (e?.code === "P2002") {
-        return NextResponse.json(
-          { ok: false, error: "同じ画像の投稿はできません（重複）" },
-          { status: 400 }
-        );
-      }
-      throw e;
-    }
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "post failed" }, { status: 400 });
+    return NextResponse.json({ ok: true, item: created });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json(
+      { ok: false, error: "投稿に失敗しました" },
+      { status: 500 }
+    );
   }
 }

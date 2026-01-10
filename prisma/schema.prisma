@@ -1,19 +1,28 @@
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL") // Neon を使う場合は推奨
 }
 
 model Spot {
   id        Int      @id @default(autoincrement())
   place     String
   bloom     Int
-  weather   String
+  weather   String?
+
+  // 任意情報
   comment   String?
   imageUrl  String?
-  imageHash String?  @unique  // ★同じ画像の多重投稿防止（nullは複数OK）
+  imageHash String?
+
   createdAt DateTime @default(now())
+
+  @@index([place])
+  @@index([createdAt])
 }
