@@ -1,27 +1,22 @@
 // src/app/api/upload/route.ts
 import { NextResponse } from "next/server";
-import path from "path";
-import fs from "fs/promises";
 import crypto from "crypto";
 import sharp from "sharp";
+import { put } from "@vercel/blob";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
-
+// 出力の目安（好みで調整OK）
 const OUT_MAX_WIDTH = 1920;
 const OUT_QUALITY_JPG = 82;
 
+// 入力サイズ制限（サーバー保護）
 const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB（目標）
 
 function sha256(buf: Buffer) {
   return crypto.createHash("sha256").update(buf).digest("hex");
-}
-
-async function ensureDir() {
-  await fs.mkdir(UPLOAD_DIR, { recursive: true });
 }
 
 export async function POST(req: Request) {
@@ -32,6 +27,7 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ ok: false, error: "file が見つかりません" }, { status: 400 });
     }
+
     if (file.size <= 0) {
       return NextResponse.json({ ok: false, error: "空ファイルです" }, { status: 400 });
     }
@@ -39,23 +35,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "ファイルが大きすぎます（10MBまで）" }, { status: 413 });
     }
 
-    const inputBuf = Buffer.from(await file.arrayBuffer());
+    const arrayBuffer = await file.arrayBuffer();
+    const inputBuf = Buffer.from(arrayBuffer);
 
-    // sharpで読めない形式（例: HEIC）が来た場合はここで落ちるので、明示的にエラーメッセージを返す
-    let out: Buffer;
-    try {
-      out = await sharp(inputBuf)
-        .rotate()
-        .resize({ width: OUT_MAX_WIDTH, withoutEnlargement: true })
-        .jpeg({ quality: OUT_QUALITY_JPG })
-        .toBuffer();
-    } catch {
-      return NextResponse.json(
-        { ok: false, error: "未対応の画像形式です（JPEG/PNG を推奨）" },
-        { status: 415 }
-      );
-    }
+    // 画像処理（リサイズ＋圧縮）: 何が来ても JPEG に寄せる
+    let out = await sharp(inputBuf)
+      .rotate()
+      .resize({ width: OUT_MAX_WIDTH, withoutEnlargement: true })
+      .jpeg({ quality: OUT_QUALITY_JPG })
+      .toBuffer();
 
+    // 大きい場合は段階的に落とす
     if (out.length > MAX_OUTPUT_BYTES) {
       out = await sharp(inputBuf)
         .rotate()
@@ -74,12 +64,15 @@ export async function POST(req: Request) {
     const hash = sha256(out);
     const outName = `${Date.now()}_${hash.slice(0, 12)}.jpg`;
 
-    await ensureDir();
-    await fs.writeFile(path.join(UPLOAD_DIR, outName), out);
+    // Vercel Blob に保存（publicアクセス）
+    const blob = await put(`uploads/${outName}`, out, {
+      access: "public",
+      contentType: "image/jpeg",
+    });
 
     return NextResponse.json({
       ok: true,
-      imageUrl: `/uploads/${outName}`,
+      imageUrl: blob.url, // ← ここが「/uploads/..」ではなく外部URLになる
       imageHash: hash,
       bytes: out.length,
     });
