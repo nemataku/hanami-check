@@ -7,7 +7,7 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL") // Neon を使う場合は推奨
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 model Spot {
@@ -16,7 +16,6 @@ model Spot {
   bloom     Int
   weather   String?
 
-  // 任意情報
   comment   String?
   imageUrl  String?
   imageHash String?

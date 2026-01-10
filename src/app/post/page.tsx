@@ -1,6 +1,6 @@
 // src/app/post/page.tsx
 import Link from "next/link";
-import SpotForm from "../../components/SpotForm";
+import SpotForm from "@/components/SpotForm";
 
 export default function PostPage() {
   return (
