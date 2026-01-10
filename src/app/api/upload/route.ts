@@ -8,16 +8,13 @@ import sharp from "sharp";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// public/uploads に保存
 const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
 
-// 出力の目安（好みで調整OK）
 const OUT_MAX_WIDTH = 1920;
 const OUT_QUALITY_JPG = 82;
 
-// 入力サイズ制限（サーバー保護）
 const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB（最終目標）
+const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB
 
 function sha256(buf: Buffer) {
   return crypto.createHash("sha256").update(buf).digest("hex");
@@ -35,7 +32,6 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ ok: false, error: "file が見つかりません" }, { status: 400 });
     }
-
     if (file.size <= 0) {
       return NextResponse.json({ ok: false, error: "空ファイルです" }, { status: 400 });
     }
@@ -43,31 +39,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "ファイルが大きすぎます（10MBまで）" }, { status: 413 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const inputBuf = Buffer.from(arrayBuffer);
+    const inputBuf = Buffer.from(await file.arrayBuffer());
 
-    // 画像処理（リサイズ＋圧縮）
-    // sharp が読めない形式（HEIC等）の場合はここで例外になる → 415で返す
+    // sharpで読めない形式（例: HEIC）が来た場合はここで落ちるので、明示的にエラーメッセージを返す
     let out: Buffer;
     try {
       out = await sharp(inputBuf)
-        .rotate() // Exif回転補正
+        .rotate()
         .resize({ width: OUT_MAX_WIDTH, withoutEnlargement: true })
         .jpeg({ quality: OUT_QUALITY_JPG })
         .toBuffer();
-    } catch (err) {
-      console.error("sharp decode failed:", err);
+    } catch {
       return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "この画像形式はサーバーで処理できませんでした（HEIC/特殊形式の可能性）。JPEG/PNGでアップロードしてください。",
-        },
+        { ok: false, error: "未対応の画像形式です（JPEG/PNG を推奨）" },
         { status: 415 }
       );
     }
 
-    // 出力サイズが大きい場合は段階的に落とす（堅め）
     if (out.length > MAX_OUTPUT_BYTES) {
       out = await sharp(inputBuf)
         .rotate()
@@ -89,11 +77,9 @@ export async function POST(req: Request) {
     await ensureDir();
     await fs.writeFile(path.join(UPLOAD_DIR, outName), out);
 
-    const imageUrl = `/uploads/${outName}`;
-
     return NextResponse.json({
       ok: true,
-      imageUrl,
+      imageUrl: `/uploads/${outName}`,
       imageHash: hash,
       bytes: out.length,
     });

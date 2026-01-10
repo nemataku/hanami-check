@@ -1,6 +1,6 @@
 // src/app/api/spots/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -9,13 +9,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const place = (searchParams.get("place") ?? "").trim();
 
-    // place指定があれば最新5件、なければ最新20件（好みで調整OK）
     const items = await prisma.spot.findMany({
       where: place
         ? {
             place: {
               contains: place,
-              mode: "insensitive", // 大文字小文字無視（Postgresで有効）
+              mode: "insensitive",
             },
           }
         : undefined,
@@ -26,10 +25,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, items });
   } catch (e) {
     console.error(e);
-    return NextResponse.json(
-      { ok: false, error: "取得に失敗しました" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "取得に失敗しました" }, { status: 500 });
   }
 }
 
@@ -50,35 +46,19 @@ export async function POST(req: Request) {
     const imageHash = body.imageHash == null ? null : String(body.imageHash);
 
     if (!place) {
-      return NextResponse.json(
-        { ok: false, error: "place は必須です" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "place は必須です" }, { status: 400 });
     }
     if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) {
-      return NextResponse.json(
-        { ok: false, error: "bloom が不正です" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "bloom が不正です" }, { status: 400 });
     }
 
     const created = await prisma.spot.create({
-      data: {
-        place,
-        bloom,
-        weather,
-        comment,
-        imageUrl,
-        imageHash,
-      },
+      data: { place, bloom, weather, comment, imageUrl, imageHash },
     });
 
     return NextResponse.json({ ok: true, item: created });
   } catch (e) {
     console.error(e);
-    return NextResponse.json(
-      { ok: false, error: "投稿に失敗しました" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: "投稿に失敗しました" }, { status: 500 });
   }
 }
