@@ -1,11 +1,10 @@
-// types/heic-convert.d.ts
 declare module "heic-convert" {
-  type HeicConvertFormat = "JPEG" | "PNG";
+  export type HeicConvertFormat = "JPEG" | "PNG";
 
   export interface HeicConvertOptions {
     buffer: Buffer | Uint8Array | ArrayBuffer;
     format?: HeicConvertFormat;
-    quality?: number;
+    quality?: number; // 0..1 or 0..100 を許容
   }
 
   const heicConvert: (options: HeicConvertOptions) => Promise<Buffer>;
