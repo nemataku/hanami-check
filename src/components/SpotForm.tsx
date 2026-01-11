@@ -7,9 +7,9 @@ import Link from "next/link";
 const BLOOM_LABELS = ["つぼみ", "咲始め", "3分咲き", "5分咲き", "7分咲き", "満開", "散る"] as const;
 const WEATHER_OPTIONS = ["晴れ", "曇り", "小雨", "雨", "雪"] as const;
 
-type UploadResult =
-  | { ok: true; imageUrl: string; imageHash: string; bytes: number }
-  | { ok: false; error: string };
+type UploadOk = { ok: true; imageUrl: string; imageHash: string; bytes: number };
+type UploadNg = { ok: false; error: string };
+type UploadResult = UploadOk | UploadNg;
 
 type PostResult =
   | { ok: true; item: unknown }
@@ -53,6 +53,13 @@ function weatherBadgeClass(weather: string | null) {
   }
 }
 
+function getErrorFromJson(x: unknown): string | null {
+  if (!x || typeof x !== "object") return null;
+  const anyX = x as any;
+  if (typeof anyX.error === "string") return anyX.error;
+  return null;
+}
+
 export default function SpotForm() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -78,26 +85,21 @@ export default function SpotForm() {
     if (!place.trim()) return false;
     if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) return false;
     if (uploading || submitting) return false;
-    // 画像が選ばれているが、まだアップロードが終わっていない場合は送らせない
     if (file && !imageUrl) return false;
     return true;
   }, [place, bloom, uploading, submitting, file, imageUrl]);
 
   function clearFileSelection() {
-    // プレビュー破棄
     if (previewUrl) URL.revokeObjectURL(previewUrl);
 
     setFile(null);
     setPreviewUrl(null);
 
-    // アップロード結果も破棄
     setImageUrl(null);
     setImageHash(null);
 
-    // エラー表示もリセット
     setUploadError(null);
 
-    // ★重要：input のファイル名表示を消す
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
@@ -109,17 +111,33 @@ export default function SpotForm() {
       const fd = new FormData();
       fd.append("file", selected);
 
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: fd,
-      });
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
 
-      const data = (await res.json()) as UploadResult;
+      // res.json() が落ちても拾う（HTML返却など）
+      const raw = await res.json().catch(() => null);
 
-      if (!res.ok || !data.ok) {
+      // まず HTTP エラーの場合
+      if (!res.ok) {
+        const msg = getErrorFromJson(raw) ?? `アップロードに失敗しました（${res.status}）`;
         setImageUrl(null);
         setImageHash(null);
-        setUploadError(!res.ok ? `アップロードに失敗しました（${res.status}）` : data.error);
+        setUploadError(msg);
+        return;
+      }
+
+      const data = raw as UploadResult;
+
+      if (!data || typeof data !== "object" || !("ok" in data)) {
+        setImageUrl(null);
+        setImageHash(null);
+        setUploadError("アップロード応答が不正です");
+        return;
+      }
+
+      if (!data.ok) {
+        setImageUrl(null);
+        setImageHash(null);
+        setUploadError(data.error);
         return;
       }
 
@@ -145,16 +163,13 @@ export default function SpotForm() {
       return;
     }
 
-    // 既存があればクリアしてから差し替え
     clearFileSelection();
 
     setFile(f);
 
-    // プレビュー（ローカル）
     const url = URL.createObjectURL(f);
     setPreviewUrl(url);
 
-    // すぐアップロード開始
     await uploadImage(f);
   }
 
@@ -173,7 +188,6 @@ export default function SpotForm() {
       return;
     }
 
-    // 画像選択ありで、アップロード未完了なら止める
     if (file && !imageUrl) {
       setFormError("画像アップロードが完了していません");
       return;
@@ -204,7 +218,6 @@ export default function SpotForm() {
       }
 
       setOkMsg("投稿しました");
-      // フォーム初期化（場所は残したいならここを外す）
       setComment("");
       clearFileSelection();
     } catch (e) {
@@ -224,7 +237,6 @@ export default function SpotForm() {
       </div>
 
       <div className="mt-6 space-y-4">
-        {/* 場所 */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-4">
           <label className="text-sm font-semibold text-neutral-900">場所（必須）</label>
           <input
@@ -235,7 +247,6 @@ export default function SpotForm() {
           />
         </section>
 
-        {/* 開花状況 */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex items-center justify-between">
             <label className="text-sm font-semibold text-neutral-900">開花状況（必須）</label>
@@ -261,7 +272,6 @@ export default function SpotForm() {
           </div>
         </section>
 
-        {/* 天気 */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex items-center justify-between">
             <label className="text-sm font-semibold text-neutral-900">天気（任意）</label>
@@ -298,7 +308,6 @@ export default function SpotForm() {
           </div>
         </section>
 
-        {/* コメント */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-4">
           <label className="text-sm font-semibold text-neutral-900">コメント（任意）</label>
           <textarea
@@ -309,7 +318,6 @@ export default function SpotForm() {
           />
         </section>
 
-        {/* 画像（任意） */}
         <section className="rounded-2xl border border-neutral-200 bg-white p-4">
           <div className="flex items-center justify-between">
             <label className="text-sm font-semibold text-neutral-900">画像（任意）</label>
@@ -333,11 +341,7 @@ export default function SpotForm() {
               </div>
 
               <div className="mt-3 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={clearFileSelection}
-                  className="text-sm font-semibold text-rose-600 hover:text-rose-700"
-                >
+                <button type="button" onClick={clearFileSelection} className="text-sm font-semibold text-rose-600 hover:text-rose-700">
                   画像をキャンセル
                 </button>
 
@@ -346,14 +350,11 @@ export default function SpotForm() {
                 </div>
               </div>
 
-              {uploadError ? (
-                <p className="mt-2 text-sm font-medium text-rose-600">画像アップロード失敗：{uploadError}</p>
-              ) : null}
+              {uploadError ? <p className="mt-2 text-sm font-medium text-rose-600">画像アップロード失敗：{uploadError}</p> : null}
             </div>
           ) : null}
         </section>
 
-        {/* メッセージ */}
         {formError ? (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
             <p className="text-sm font-semibold text-rose-700">{formError}</p>
@@ -366,7 +367,6 @@ export default function SpotForm() {
           </div>
         ) : null}
 
-        {/* ボタン */}
         <div className="space-y-3">
           <button
             type="button"
