@@ -9,26 +9,27 @@ const MAX_INPUT_BYTES = 10 * 1024 * 1024;
 
 export async function POST(req: Request) {
   try {
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) {
+      return NextResponse.json(
+        { ok: false, error: "BLOB_READ_WRITE_TOKEN が未設定です（Vercelの環境変数を確認）" },
+        { status: 500 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
 
     if (!file) {
-      return NextResponse.json(
-        { ok: false, error: "ファイルがありません" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "ファイルがありません" }, { status: 400 });
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
 
     if (buf.length > MAX_INPUT_BYTES) {
-      return NextResponse.json(
-        { ok: false, error: "ファイルサイズが大きすぎます" },
-        { status: 400 }
-      );
+      return NextResponse.json({ ok: false, error: "ファイルサイズが大きすぎます" }, { status: 400 });
     }
 
-    // 画像変換
     const output = await sharp(buf)
       .rotate()
       .resize({ width: 1280, withoutEnlargement: true })
@@ -38,24 +39,22 @@ export async function POST(req: Request) {
     const hash = crypto.createHash("sha256").update(output).digest("hex");
     const filename = `uploads/${Date.now()}_${hash.slice(0, 12)}.jpg`;
 
-    // ✅ Blob 保存
     const blob = await put(filename, output, {
       access: "public",
       contentType: "image/jpeg",
+      token, // ★明示（これが重要）
     });
 
-    // ✅ ここまで来たら「アップロード成功」
     return NextResponse.json({
       ok: true,
       imageUrl: blob.url,
       imageHash: hash,
       bytes: output.length,
     });
-
   } catch (e) {
     console.error("upload error:", e);
     return NextResponse.json(
-      { ok: false, error: "サーバー側でエラーが発生しました" },
+      { ok: false, error: "サーバー側でエラーが発生しました（Logsを確認してください）" },
       { status: 500 }
     );
   }
