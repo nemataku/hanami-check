@@ -38,6 +38,49 @@ function weatherBadgeClass(weather: string | null) {
   }
 }
 
+/**
+ * 相対時間表示（◯分前 / ◯時間前 / ◯日前）
+ * ※差分はタイムゾーンに依存しないので、UTC保存でもOK
+ */
+function timeAgo(input: string | Date) {
+  const t = input instanceof Date ? input.getTime() : new Date(input).getTime();
+  const now = Date.now();
+  if (!Number.isFinite(t)) return "-";
+
+  let diff = now - t;
+  if (diff < 0) diff = 0; // 未来時刻（時計ズレ等）の保険
+
+  const sec = Math.floor(diff / 1000);
+  if (sec < 30) return "たった今";
+
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}分前`;
+
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}時間前`;
+
+  const day = Math.floor(hour / 24);
+  return `${day}日前`;
+}
+
+/**
+ * 日本時間（Asia/Tokyo）で「YYYY/MM/DD HH:mm」に整形
+ */
+function formatJST(input: string | Date) {
+  const d = input instanceof Date ? input : new Date(input);
+  if (!Number.isFinite(d.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
 export default async function ResultsPage({ searchParams }: PageProps) {
   const sp = await Promise.resolve(searchParams ?? {});
   const place = (sp.place ?? "").trim();
@@ -107,8 +150,9 @@ export default async function ResultsPage({ searchParams }: PageProps) {
                 {s.weather ?? "-"}
               </span>
 
+              {/* ✅ ここが変更：相対（◯日前）＋ 日本時間の投稿日時 */}
               <span className="ml-auto text-xs text-neutral-400">
-                {new Date(s.createdAt).toLocaleString()}
+                {timeAgo(s.createdAt)}（{formatJST(s.createdAt)}）
               </span>
             </div>
 
