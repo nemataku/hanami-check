@@ -16,10 +16,16 @@ function requireAdmin(req: Request) {
   const token = bearer || headerToken;
 
   if (!process.env.ADMIN_TOKEN) {
-    return { ok: false as const, res: NextResponse.json({ ok: false, error: "ADMIN_TOKEN が未設定です" }, { status: 500 }) };
+    return {
+      ok: false as const,
+      res: NextResponse.json({ ok: false, error: "ADMIN_TOKEN が未設定です" }, { status: 500 }),
+    };
   }
   if (!token || token !== process.env.ADMIN_TOKEN) {
-    return { ok: false as const, res: NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 }) };
+    return {
+      ok: false as const,
+      res: NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 }),
+    };
   }
   return { ok: true as const };
 }
@@ -50,8 +56,8 @@ export async function GET(req: Request) {
 
 /**
  * DELETE:
- * 1) /api/admin/spots?id=xxx  -> 1件削除
- * 2) /api/admin/spots         -> 全件削除（投稿データ全削除）
+ * 1) /api/admin/spots?id=123  -> 1件削除（id が Int の場合）
+ * 2) /api/admin/spots         -> 全件削除
  */
 export async function DELETE(req: Request) {
   const auth = requireAdmin(req);
@@ -59,13 +65,21 @@ export async function DELETE(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const id = (searchParams.get("id") ?? "").trim();
+    const idStr = (searchParams.get("id") ?? "").trim();
 
-    if (id) {
-      await prisma.spot.delete({ where: { id } });
+    // id 指定があるなら 1件削除
+    if (idStr) {
+      // ✅ Prisma の id が Int のため number に変換
+      const idNum = Number(idStr);
+      if (!Number.isInteger(idNum) || idNum <= 0) {
+        return NextResponse.json({ ok: false, error: "id が不正です" }, { status: 400 });
+      }
+
+      await prisma.spot.delete({ where: { id: idNum } });
       return NextResponse.json({ ok: true, deleted: 1 });
     }
 
+    // id なしなら全削除
     const r = await prisma.spot.deleteMany({});
     return NextResponse.json({ ok: true, deleted: r.count });
   } catch (e) {
