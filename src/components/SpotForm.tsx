@@ -383,19 +383,30 @@ export default function SpotForm() {
           </div>
         ) : null}
 
-        {/* ボタン */}
-        <div className="space-y-3">
-          <button
-            type="button"
-            onClick={onSubmit}
-            disabled={!canSubmit}
-            className={[
-              "inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold shadow-sm",
-              canSubmit ? "bg-neutral-900 text-white hover:bg-neutral-800" : "bg-neutral-200 text-neutral-500",
-            ].join(" ")}
-          >
-            {submitting ? "投稿中..." : "投稿する"}
-          </button>
+{/* ボタン */}
+<div className="space-y-3">
+  <button
+    type="button"
+    onClick={onSubmit}
+    disabled={!canSubmit}
+    className={[
+      "inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold shadow-sm",
+      canSubmit
+        ? "bg-neutral-900 text-white hover:bg-neutral-800"
+        : "bg-neutral-200 text-neutral-500",
+    ].join(" ")}
+  >
+    {submitting ? "投稿中..." : "投稿する"}
+  </button>
+
+  {/* ← TOPに戻るはここだけ残す */}
+  <Link
+    href="/"
+    className="inline-flex w-full items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 shadow-sm hover:bg-neutral-50"
+  >
+    TOPに戻る
+  </Link>
+</div>
 
           <Link
             href="/"
