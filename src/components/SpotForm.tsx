@@ -1,7 +1,7 @@
 // src/components/SpotForm.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const BLOOM_LABELS = ["つぼみ", "咲始め", "3分咲き", "5分咲き", "7分咲き", "満開", "散る"] as const;
@@ -12,6 +12,9 @@ type WeatherValue = (typeof WEATHER_OPTIONS)[number] | "";
 
 export default function SpotForm() {
   const router = useRouter();
+
+  // ★ file input の値を物理的に消すためのref
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [place, setPlace] = useState("");
   const [bloom, setBloom] = useState<BloomValue>(3);
@@ -52,7 +55,6 @@ export default function SpotForm() {
   }, [place, posting, uploading]);
 
   async function uploadIfNeeded(): Promise<{ imageUrl: string; imageHash: string } | null> {
-    // 画像なしならアップロードしない（＝画像なし投稿OK）
     if (!file) return null;
 
     // すでにアップロード済みなら再利用
@@ -75,9 +77,7 @@ export default function SpotForm() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data || data.ok !== true) {
-        const msg =
-          (data && data.error) ||
-          `アップロードに失敗しました（status ${res.status}）`;
+        const msg = (data && data.error) || `アップロードに失敗しました（status ${res.status}）`;
         throw new Error(msg);
       }
 
@@ -107,7 +107,6 @@ export default function SpotForm() {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "画像アップロードに失敗しました";
         setUploadError(msg);
-        // 画像あり投稿でアップロード失敗は投稿しない（要件：画像ありで投稿できるよう修正）
         return;
       }
 
@@ -129,15 +128,12 @@ export default function SpotForm() {
       const data = await res.json().catch(() => null);
 
       if (!res.ok || !data || data.ok !== true) {
-        const msg =
-          (data && data.error) ||
-          `投稿に失敗しました（status ${res.status}）`;
+        const msg = (data && data.error) || `投稿に失敗しました（status ${res.status}）`;
         throw new Error(msg);
       }
 
       setDone(true);
 
-      // 投稿後は検索結果へ（placeで表示される）
       router.push(`/results?place=${encodeURIComponent(payload.place)}`);
       router.refresh();
     } catch (e) {
@@ -152,11 +148,16 @@ export default function SpotForm() {
     setFile(null);
     setPreviewUrl(null);
 
-    // 既にアップロード済み情報もクリア（再投稿時に混乱しない）
+    // 既にアップロード済み情報もクリア
     setImageUrl(null);
     setImageHash(null);
 
     setUploadError(null);
+
+    // ★ ここがポイント：file input の表示（ファイル名）を消す
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   return (
@@ -256,6 +257,7 @@ export default function SpotForm() {
         <label className="text-sm font-semibold text-neutral-900">画像（任意）</label>
 
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
@@ -278,9 +280,7 @@ export default function SpotForm() {
           </div>
         ) : null}
 
-        {uploadError ? (
-          <p className="text-sm font-medium text-red-600">{uploadError}</p>
-        ) : null}
+        {uploadError ? <p className="text-sm font-medium text-red-600">{uploadError}</p> : null}
       </div>
 
       {/* エラー */}
@@ -305,9 +305,7 @@ export default function SpotForm() {
         {uploading ? "画像アップロード中..." : posting ? "投稿中..." : "投稿する"}
       </button>
 
-      {done ? (
-        <p className="text-xs text-neutral-500">投稿しました。結果ページへ移動します…</p>
-      ) : null}
+      {done ? <p className="text-xs text-neutral-500">投稿しました。結果ページへ移動します…</p> : null}
     </div>
   );
 }
