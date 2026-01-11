@@ -2,7 +2,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import Link from "next/link";
 
 const BLOOM_LABELS = ["つぼみ", "咲始め", "3分咲き", "5分咲き", "7分咲き", "満開", "散る"] as const;
 const WEATHER_OPTIONS = ["晴れ", "曇り", "小雨", "雨", "雪"] as const;
@@ -78,6 +77,7 @@ export default function SpotForm() {
     if (!place.trim()) return false;
     if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) return false;
     if (uploading || submitting) return false;
+    // 画像が選ばれているが、まだアップロードが終わっていない場合は送らせない
     if (file && !imageUrl) return false;
     return true;
   }, [place, bloom, uploading, submitting, file, imageUrl]);
@@ -87,13 +87,17 @@ export default function SpotForm() {
 
     setFile(null);
     setPreviewUrl(null);
+
     setImageUrl(null);
     setImageHash(null);
+
     setUploadError(null);
 
+    // input のファイル名表示を消す
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
+  // ✅ ここが今回のTypeScriptエラー修正ポイント（段階的に絞り込み）
   async function uploadImage(selected: File) {
     setUploading(true);
     setUploadError(null);
@@ -109,17 +113,30 @@ export default function SpotForm() {
 
       const data = (await res.json()) as UploadResult;
 
-      if (!res.ok || !data.ok) {
+      // ① HTTPエラー（ここでは data.error を読まない）
+      if (!res.ok) {
         setImageUrl(null);
         setImageHash(null);
-        setUploadError(!res.ok ? `アップロードに失敗しました（${res.status}）` : data.error);
+        setUploadError(`アップロードに失敗しました（${res.status}）`);
         return;
       }
 
+      // ② HTTPはOKでもアプリとして失敗（data.ok=false）
+      if (!data.ok) {
+        setImageUrl(null);
+        setImageHash(null);
+        setUploadError(data.error);
+        return;
+      }
+
+      // ③ 成功
       setImageUrl(data.imageUrl);
       setImageHash(data.imageHash);
+      setUploadError(null);
     } catch (e) {
       console.error(e);
+      setImageUrl(null);
+      setImageHash(null);
       setUploadError("アップロードに失敗しました");
     } finally {
       setUploading(false);
@@ -135,7 +152,9 @@ export default function SpotForm() {
       return;
     }
 
+    // 既存があればクリアしてから差し替え
     clearFileSelection();
+
     setFile(f);
 
     const url = URL.createObjectURL(f);
@@ -148,7 +167,8 @@ export default function SpotForm() {
     setOkMsg(null);
     setFormError(null);
 
-    if (!place.trim()) {
+    const placeTrim = place.trim();
+    if (!placeTrim) {
       setFormError("場所を入力してください");
       return;
     }
@@ -165,23 +185,30 @@ export default function SpotForm() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        place: placeTrim,
+        bloom,
+        weather: weather === "" ? null : weather,
+        comment: comment.trim() === "" ? null : comment.trim(),
+        imageUrl,
+        imageHash,
+      };
+
       const res = await fetch("/api/spots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          place: place.trim(),
-          bloom,
-          weather: weather === "" ? null : weather,
-          comment: comment.trim() || null,
-          imageUrl,
-          imageHash,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = (await res.json()) as PostResult;
 
-      if (!res.ok || !data.ok) {
-        setFormError(!res.ok ? `投稿に失敗しました（${res.status}）` : data.error);
+      // ✅ ここも同じく段階的に絞り込み（TSエラー回避）
+      if (!res.ok) {
+        setFormError(`投稿に失敗しました（${res.status}）`);
+        return;
+      }
+      if (!data.ok) {
+        setFormError(data.error);
         return;
       }
 
@@ -200,80 +227,160 @@ export default function SpotForm() {
     <main className="mx-auto w-full max-w-md px-4 py-8">
       <div className="rounded-2xl bg-pink-50 p-4 ring-1 ring-pink-100">
         <p className="text-xs font-medium text-pink-700">開花状況を投稿</p>
-        <h1 className="mt-1 text-xl font-semibold">花見スポットの今を共有</h1>
+        <h1 className="mt-1 text-xl font-semibold text-neutral-900">花見スポットの今を共有</h1>
         <p className="mt-1 text-xs text-neutral-600">場所・開花・天気を選んで投稿できます</p>
       </div>
 
       <div className="mt-6 space-y-4">
         {/* 場所 */}
-        <section className="rounded-2xl border bg-white p-4">
-          <label className="text-sm font-semibold">場所（必須）</label>
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+          <label className="text-sm font-semibold text-neutral-900">場所（必須）</label>
           <input
             value={place}
             onChange={(e) => setPlace(e.target.value)}
             placeholder="例：上野公園 / 東京駅"
-            className="mt-2 w-full rounded-xl border px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
           />
         </section>
 
+        {/* 開花状況 */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-neutral-900">開花状況（必須）</label>
+            <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", bloomBadgeClass(bloom)].join(" ")}>
+              {BLOOM_LABELS[bloom] ?? "-"}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {BLOOM_LABELS.map((label, idx) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setBloom(idx)}
+                className={[
+                  "rounded-xl border px-2 py-2 text-xs font-medium",
+                  idx === bloom ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50",
+                ].join(" ")}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* 天気 */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-neutral-900">天気（任意）</label>
+            <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", weatherBadgeClass(weather === "" ? null : weather)].join(" ")}>
+              {weather === "" ? "-" : weather}
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setWeather("")}
+              className={[
+                "rounded-xl border px-3 py-2 text-xs font-medium",
+                weather === "" ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50",
+              ].join(" ")}
+            >
+              未選択
+            </button>
+
+            {WEATHER_OPTIONS.map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setWeather(w)}
+                className={[
+                  "rounded-xl border px-3 py-2 text-xs font-medium",
+                  weather === w ? "border-neutral-900 bg-neutral-900 text-white" : "border-neutral-200 bg-white text-neutral-900 hover:bg-neutral-50",
+                ].join(" ")}
+              >
+                {w}
+              </button>
+            ))}
+          </div>
+        </section>
+
         {/* コメント */}
-        <section className="rounded-2xl border bg-white p-4">
-          <label className="text-sm font-semibold">コメント（任意）</label>
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+          <label className="text-sm font-semibold text-neutral-900">コメント（任意）</label>
           <textarea
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             placeholder="例：かなり混雑、まだ5分咲き など"
-            className="mt-2 min-h-[96px] w-full rounded-xl border px-3 py-2 text-sm"
+            className="mt-2 min-h-[96px] w-full resize-y rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
           />
         </section>
 
-        {/* 画像 */}
-        <section className="rounded-2xl border bg-white p-4">
-          <label className="text-sm font-semibold">画像（任意）</label>
+        {/* 画像（任意） */}
+        <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-semibold text-neutral-900">画像（任意）</label>
+            <p className="text-xs text-neutral-500">JPEG / PNG / WebP のみ（10MBまで）</p>
+          </div>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
-            className="mt-2 block w-full text-sm"
-          />
+          <div className="mt-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => onPickFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-white hover:file:bg-neutral-800"
+            />
+          </div>
 
-          {previewUrl && (
-            <div className="mt-3">
-              <img src={previewUrl} alt="preview" className="rounded-lg" />
-              <div className="mt-2 flex justify-between text-sm">
-                <button onClick={clearFileSelection} className="text-rose-600">
+          {previewUrl ? (
+            <div className="mt-3 rounded-xl border border-neutral-200 p-3">
+              <div className="overflow-hidden rounded-lg ring-1 ring-neutral-200">
+                <img src={previewUrl} alt="選択画像" className="h-auto w-full object-cover" />
+              </div>
+
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <button type="button" onClick={clearFileSelection} className="text-sm font-semibold text-rose-600 hover:text-rose-700">
                   画像をキャンセル
                 </button>
-                <span>{uploading ? "アップロード中…" : imageUrl ? "アップロード済み" : "未アップロード"}</span>
+
+                <div className="text-xs text-neutral-500">{uploading ? "アップロード中..." : imageUrl ? "アップロード済み" : "未アップロード"}</div>
               </div>
-              {uploadError && <p className="mt-1 text-sm text-rose-600">{uploadError}</p>}
+
+              {uploadError ? <p className="mt-2 text-sm font-medium text-rose-600">画像アップロード失敗：{uploadError}</p> : null}
             </div>
-          )}
+          ) : null}
         </section>
 
-        {formError && <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{formError}</p>}
-        {okMsg && <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700">{okMsg}</p>}
+        {/* メッセージ */}
+        {formError ? (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <p className="text-sm font-semibold text-rose-700">{formError}</p>
+          </div>
+        ) : null}
 
-        {/* ボタン（TOPに戻るは1つだけ） */}
+        {okMsg ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+            <p className="text-sm font-semibold text-emerald-700">{okMsg}</p>
+          </div>
+        ) : null}
+
+        {/* ボタン */}
         <div className="space-y-3">
           <button
+            type="button"
             onClick={onSubmit}
             disabled={!canSubmit}
-            className={`w-full rounded-xl py-3 text-sm font-semibold ${
-              canSubmit ? "bg-neutral-900 text-white" : "bg-neutral-200 text-neutral-500"
-            }`}
+            className={[
+              "inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold shadow-sm",
+              canSubmit ? "bg-neutral-900 text-white hover:bg-neutral-800" : "bg-neutral-200 text-neutral-500",
+            ].join(" ")}
           >
             {submitting ? "投稿中..." : "投稿する"}
           </button>
 
-          <Link
-            href="/"
-            className="block w-full rounded-xl border bg-white py-3 text-center text-sm font-semibold"
-          >
-            TOPに戻る
-          </Link>
+          {/* ✅ 「TOPに戻る」ボタンはFooter側にある前提で、ここでは出さない（1つに統一） */}
         </div>
       </div>
     </main>
