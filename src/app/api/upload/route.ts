@@ -11,9 +11,9 @@ export const dynamic = "force-dynamic";
 const OUT_MAX_WIDTH = 1920;
 const OUT_QUALITY_JPG = 82;
 
-// 入力サイズ制限（サーバー保護）
+// 入力サイズ制限
 const MAX_INPUT_BYTES = 10 * 1024 * 1024; // 10MB
-const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB（目標）
+const MAX_OUTPUT_BYTES = 2 * 1024 * 1024; // 2MB
 
 function sha256(buf: Buffer) {
   return crypto.createHash("sha256").update(buf).digest("hex");
@@ -27,7 +27,6 @@ export async function POST(req: Request) {
     if (!(file instanceof File)) {
       return NextResponse.json({ ok: false, error: "file が見つかりません" }, { status: 400 });
     }
-
     if (file.size <= 0) {
       return NextResponse.json({ ok: false, error: "空ファイルです" }, { status: 400 });
     }
@@ -35,17 +34,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: "ファイルが大きすぎます（10MBまで）" }, { status: 413 });
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const inputBuf = Buffer.from(arrayBuffer);
+    const inputBuf = Buffer.from(await file.arrayBuffer());
 
-    // 画像処理（リサイズ＋圧縮）: 何が来ても JPEG に寄せる
+    // 画像処理（リサイズ＋圧縮）
     let out = await sharp(inputBuf)
       .rotate()
       .resize({ width: OUT_MAX_WIDTH, withoutEnlargement: true })
       .jpeg({ quality: OUT_QUALITY_JPG })
       .toBuffer();
 
-    // 大きい場合は段階的に落とす
+    // 出力が大きい場合は段階的に落とす
     if (out.length > MAX_OUTPUT_BYTES) {
       out = await sharp(inputBuf)
         .rotate()
@@ -64,7 +62,7 @@ export async function POST(req: Request) {
     const hash = sha256(out);
     const outName = `${Date.now()}_${hash.slice(0, 12)}.jpg`;
 
-    // Vercel Blob に保存（publicアクセス）
+    // Vercel Blob に保存（public）
     const blob = await put(`uploads/${outName}`, out, {
       access: "public",
       contentType: "image/jpeg",
@@ -72,7 +70,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      imageUrl: blob.url, // ← ここが「/uploads/..」ではなく外部URLになる
+      imageUrl: blob.url, // 外部URL（Vercel BlobのURL）
       imageHash: hash,
       bytes: out.length,
     });
