@@ -1,9 +1,17 @@
+// src/app/layout.tsx
 import "./globals.css";
 import Link from "next/link";
 
+/**
+ * Google Search Console（HTMLタグ方式）対応
+ * ↓ Search Console に表示された `content` の値をここに入れてください
+ */
 export const metadata = {
   title: "Hanami Check",
   description: "いま行くべき花見スポットを、投稿ベースで判断。",
+  verification: {
+    google: "google-site-verification: googled8ffd942802f2c1f.html",
+  },
 };
 
 export default function RootLayout({
