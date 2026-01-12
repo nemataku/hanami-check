@@ -1,51 +1,36 @@
 // src/app/layout.tsx
 import "./globals.css";
 import Link from "next/link";
+import type { Metadata } from "next";
 
-/**
- * Google Search Console（HTMLタグ方式）対応
- * ↓ Search Console に表示された `content` の値をここに入れてください
- */
-export const metadata = {
+export const metadata: Metadata = {
   title: "Hanami Check",
   description: "いま行くべき花見スポットを、投稿ベースで判断。",
   verification: {
-    google: "google-site-verification: googled8ffd942802f2c1f.html",
+    // ✅ Search Console の「HTMLタグ」方式で出てくる
+    // <meta name="google-site-verification" content="XXXX" />
+    // の content="XXXX" の XXXX だけを貼る
+    google: "gGjpyfzl-oqGnV6Nq5boHkLLYiJJ0aqBmyh33TpIwaY",
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
       <body className="min-h-screen bg-neutral-50 text-neutral-900">
-        {/* ===== メインコンテンツ ===== */}
         <div className="flex min-h-screen flex-col">
           <main className="flex-1">{children}</main>
 
-          {/* ===== フッター ===== */}
           <footer className="border-t border-neutral-200 bg-white">
             <div className="mx-auto w-full max-w-md px-4 py-6">
               <nav className="flex justify-center gap-6 text-xs text-neutral-600">
-                <Link
-                  href="/terms"
-                  className="hover:text-neutral-900 hover:underline"
-                >
+                <Link href="/terms" className="hover:text-neutral-900 hover:underline">
                   利用規約
                 </Link>
-                <Link
-                  href="/privacy"
-                  className="hover:text-neutral-900 hover:underline"
-                >
+                <Link href="/privacy" className="hover:text-neutral-900 hover:underline">
                   プライバシーポリシー
                 </Link>
-                <Link
-                  href="/contact"
-                  className="hover:text-neutral-900 hover:underline"
-                >
+                <Link href="/contact" className="hover:text-neutral-900 hover:underline">
                   お問い合わせ
                 </Link>
               </nav>
