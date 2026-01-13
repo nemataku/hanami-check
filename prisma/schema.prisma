@@ -11,17 +11,24 @@ datasource db {
 }
 
 model Spot {
-  id        Int      @id @default(autoincrement())
-  place     String
-  bloom     Int
-  weather   String?
+  id            Int      @id @default(autoincrement())
 
-  comment   String?
-  imageUrl  String?
-  imageHash String?
+  // ===== 投稿内容 =====
+  place         String
+  bloom         Int
+  weather       String?
+  comment       String?
+  imageUrl      String?
+  imageHash     String?
 
-  createdAt DateTime @default(now())
+  // ===== 投稿者（匿名ID / cookieベース）=====
+  contributorId String
 
+  // ===== 日時 =====
+  createdAt     DateTime @default(now())
+
+  // ===== インデックス =====
   @@index([place])
   @@index([createdAt])
+  @@index([contributorId])
 }
