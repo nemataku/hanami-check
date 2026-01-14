@@ -5,17 +5,15 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-//////////////////////////////////////////////////////
-// 投稿者（匿名ユーザー）
-//////////////////////////////////////////////////////
+/**
+ * 投稿者（匿名・Cookieベース想定）
+ */
 model Contributor {
-  id        Int      @id @default(autoincrement())
-  uuid      String   @unique
+  id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
   spots     Spot[]
@@ -23,9 +21,9 @@ model Contributor {
   @@index([createdAt])
 }
 
-//////////////////////////////////////////////////////
-// 投稿データ（花見・イベント・スポット共通）
-//////////////////////////////////////////////////////
+/**
+ * 投稿データ
+ */
 model Spot {
   id            Int      @id @default(autoincrement())
 
@@ -37,12 +35,14 @@ model Spot {
   imageUrl      String?
   imageHash     String?
 
-  contributorId Int?
-  contributor   Contributor? @relation(fields: [contributorId], references: [id])
+  contributorId String
+  contributor   Contributor @relation(fields: [contributorId], references: [id])
 
   createdAt     DateTime @default(now())
+  deletedAt     DateTime?
 
   @@index([place])
   @@index([createdAt])
+  @@index([deletedAt])
   @@index([contributorId])
 }
