@@ -10,24 +10,38 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+//////////////////////////////////////////////////////
+// 投稿者（匿名ユーザー）
+//////////////////////////////////////////////////////
+model Contributor {
+  id        Int      @id @default(autoincrement())
+  uuid      String   @unique
+  createdAt DateTime @default(now())
+
+  spots     Spot[]
+
+  @@index([createdAt])
+}
+
+//////////////////////////////////////////////////////
+// 投稿データ（花見・イベント・スポット共通）
+//////////////////////////////////////////////////////
 model Spot {
   id            Int      @id @default(autoincrement())
 
-  // ===== 投稿内容 =====
   place         String
   bloom         Int
   weather       String?
+
   comment       String?
   imageUrl      String?
   imageHash     String?
 
-  // ===== 投稿者（匿名ID / cookieベース）=====
-  contributorId String
+  contributorId Int?
+  contributor   Contributor? @relation(fields: [contributorId], references: [id])
 
-  // ===== 日時 =====
   createdAt     DateTime @default(now())
 
-  // ===== インデックス =====
   @@index([place])
   @@index([createdAt])
   @@index([contributorId])
