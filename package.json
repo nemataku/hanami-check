@@ -4,31 +4,27 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+
     "prisma:generate": "prisma generate",
-    "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:studio": "prisma studio"
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
-    "@vercel/blob": "^2.0.0",
-    "browser-image-compression": "^2.0.2",
-    "jsqr": "^1.4.0",
     "next": "16.1.1",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0",
-    "sharp": "^0.34.5"
+    "react-dom": "^18.3.0"
   },
   "devDependencies": {
-    "@types/node": "^25.0.5",
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.35",
     "prisma": "^5.22.0",
-    "tailwindcss": "^3.4.17",
-    "typescript": "^5.4.5"
+    "typescript": "^5.3.3",
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "16.1.1"
   }
 }
