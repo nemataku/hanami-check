@@ -1,26 +1,30 @@
 // src/lib/contributor.ts
-import { prisma } from "./prisma";
 import { cookies } from "next/headers";
+import { randomUUID } from "crypto";
 
-const COOKIE_NAME = "hc_contributor_id";
+export const COOKIE_KEY = "hc_contributor_id";
 
-export async function getOrCreateContributorId() {
-  const cookieStore = cookies();
-  const existing = cookieStore.get(COOKIE_NAME)?.value;
+type EnsureResult = {
+  id: string;
+  isNew: boolean;
+};
 
-  if (existing) {
-    return existing;
-  }
+export async function ensureContributorId(): Promise<EnsureResult> {
+  const store = await cookies(); // ★ここがポイント（Promiseなのでawait）
 
-  const contributor = await prisma.contributor.create({
-    data: {},
-  });
+  const existing = store.get(COOKIE_KEY)?.value;
+  if (existing) return { id: existing, isNew: false };
 
-  cookieStore.set(COOKIE_NAME, String(contributor.id), {
+  const id = randomUUID();
+  return { id, isNew: true };
+}
+
+export function contributorCookieOptions() {
+  return {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
     path: "/",
-  });
-
-  return String(contributor.id);
+    maxAge: 60 * 60 * 24 * 365, // 1年
+  };
 }
