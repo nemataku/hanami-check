@@ -6,21 +6,20 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // 投稿数ランキング（上位20）
-    const rows = await prisma.$queryRaw<
-      { contributorId: string; posts: number }[]
-    >`
-      SELECT
-        "contributorId" AS "contributorId",
-        COUNT(*)::int    AS "posts"
-      FROM "Spot"
-      WHERE "contributorId" IS NOT NULL
-      GROUP BY "contributorId"
-      ORDER BY "posts" DESC
-      LIMIT 20;
-    `;
+    const rows = await prisma.spot.groupBy({
+      by: ["contributorId"] as const,
+      where: { contributorId: { not: null } },
+      _count: { contributorId: true },
+      orderBy: { _count: { contributorId: "desc" } },
+      take: 20,
+    });
 
-    return NextResponse.json({ ok: true, items: rows });
+    const items = rows.map((r) => ({
+      contributorId: r.contributorId, // string | null
+      posts: r._count.contributorId,
+    }));
+
+    return NextResponse.json({ ok: true, items });
   } catch (e) {
     console.error(e);
     return NextResponse.json(

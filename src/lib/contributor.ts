@@ -1,30 +1,29 @@
 // src/lib/contributor.ts
 import { cookies } from "next/headers";
-import { randomUUID } from "crypto";
+import crypto from "crypto";
 
-export const COOKIE_KEY = "hc_contributor_id";
+const COOKIE_KEY = "contributorId";
 
-type EnsureResult = {
-  id: string;
-  isNew: boolean;
-};
-
-export async function ensureContributorId(): Promise<EnsureResult> {
-  const store = await cookies(); // ★ここがポイント（Promiseなのでawait）
-
+export async function getOrCreateContributorId(): Promise<{ id: string }> {
+  // ✅ Next.jsのバージョンによって cookies() が Promise なので await
+  const store = await cookies();
   const existing = store.get(COOKIE_KEY)?.value;
-  if (existing) return { id: existing, isNew: false };
 
-  const id = randomUUID();
-  return { id, isNew: true };
-}
+  if (existing) return { id: existing };
 
-export function contributorCookieOptions() {
-  return {
+  const id =
+    typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : crypto.randomBytes(16).toString("hex");
+
+  // Cookie をセット（投稿者IDの永続化）
+  store.set(COOKIE_KEY, id, {
     httpOnly: true,
-    sameSite: "lax" as const,
+    sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 60 * 60 * 24 * 365, // 1年
-  };
+  });
+
+  return { id };
 }
