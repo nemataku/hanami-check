@@ -2,9 +2,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import {
-  ensureContributorId,
   COOKIE_KEY,
   contributorCookieOptions,
+  ensureContributorId,
 } from "@/lib/contributor";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +32,17 @@ export async function GET(req: Request) {
   }
 }
 
+function normalizeImageUrl(v: unknown): string | null {
+  if (v == null) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+
+  // public blob URL などを想定：最低限 http/https のみ許可
+  if (!/^https?:\/\/.+/i.test(s)) return null;
+
+  return s;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -45,7 +56,7 @@ export async function POST(req: Request) {
         ? null
         : String(body.comment).trim();
 
-    const imageUrl = body.imageUrl == null ? null : String(body.imageUrl);
+    const imageUrl = normalizeImageUrl(body.imageUrl);
     const imageHash = body.imageHash == null ? null : String(body.imageHash);
 
     if (!place) {
@@ -63,7 +74,7 @@ export async function POST(req: Request) {
 
     const { id: contributorId, isNew } = await ensureContributorId();
 
-    // ★ Contributor を必ず存在させる
+    // Contributor を必ず存在させる
     await prisma.contributor.upsert({
       where: { id: contributorId },
       update: {},
@@ -85,7 +96,8 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ ok: true, item: created });
 
     if (isNew) {
-      res.cookies.set(COOKIE_KEY, contributorId, contributorCookieOptions());
+      // ✅ () を付けない：object を渡す
+      res.cookies.set(COOKIE_KEY, contributorId, contributorCookieOptions);
     }
 
     return res;

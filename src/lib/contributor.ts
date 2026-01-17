@@ -1,29 +1,49 @@
 // src/lib/contributor.ts
-import { cookies } from "next/headers";
 import crypto from "crypto";
+import { cookies } from "next/headers";
 
-const COOKIE_KEY = "contributorId";
+export const COOKIE_KEY = "contributorId";
 
-export async function getOrCreateContributorId(): Promise<{ id: string }> {
-  // ✅ Next.jsのバージョンによって cookies() が Promise なので await
-  const store = await cookies();
-  const existing = store.get(COOKIE_KEY)?.value;
+export const contributorCookieOptions = {
+  httpOnly: true,
+  sameSite: "lax" as const,
+  secure: process.env.NODE_ENV === "production",
+  path: "/",
+  maxAge: 60 * 60 * 24 * 365, // 1年
+};
 
-  if (existing) return { id: existing };
+/**
+ * cookies() の Next.js バージョン差分吸収（object or Promise）
+ */
+async function getCookieStore() {
+  // cookies() が Promise を返す環境でも、通常のオブジェクトでも動くようにする
+  return await Promise.resolve(cookies() as any);
+}
 
-  const id =
-    typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : crypto.randomBytes(16).toString("hex");
+/**
+ * 現在の contributorId を cookie から読む（なければ null）
+ */
+export async function readContributorId(): Promise<string | null> {
+  const store = await getCookieStore();
+  return store.get(COOKIE_KEY)?.value ?? null;
+}
 
-  // Cookie をセット（投稿者IDの永続化）
-  store.set(COOKIE_KEY, id, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365, // 1年
-  });
+/**
+ * 新しい contributorId を作る
+ */
+export function newContributorId(): string {
+  return crypto.randomUUID();
+}
 
-  return { id };
+/**
+ * contributorId を必ず返す（cookieが無ければ新規発行）
+ * - id: contributorId
+ * - isNew: 新規発行したかどうか
+ */
+export async function ensureContributorId(): Promise<{ id: string; isNew: boolean }> {
+  const existing = await readContributorId();
+  if (existing) return { id: existing, isNew: false };
+
+  const id = newContributorId();
+  return { id, isNew: true };
 }
