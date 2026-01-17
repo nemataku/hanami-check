@@ -8,6 +8,15 @@ datasource db {
   directUrl = env("DIRECT_DATABASE_URL")
 }
 
+enum Category {
+  HANAMI     // 花見（咲き具合 = bloom を使う）
+  SCENIC     // 景勝地（見頃 = condition）
+  FACILITY   // 商業施設（混雑 = crowd）
+  FOOD       // 飲食（混雑 = crowd）
+  EVENT      // イベント（混雑 = crowd）
+  PARKING    // 駐車場（空き = condition）
+}
+
 model Contributor {
   id        String   @id
   createdAt DateTime @default(now())
@@ -15,18 +24,30 @@ model Contributor {
 }
 
 model Spot {
-  id            Int          @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
+  category      Category  @default(HANAMI)
+
   place         String
-  bloom         Int
+  bloom         Int       @default(0) // 花見専用（0..6）
   weather       String?
+
+  // 1..5：景勝地の見頃 / 駐車場の空き 等（カテゴリによって意味が変わる）
+  condition     Int       @default(3)
+
+  // 1..5：混雑度
+  crowd         Int       @default(3)
+
   comment       String?
   imageUrl      String?
   imageHash     String?
+
   contributorId String?
   contributor   Contributor? @relation(fields: [contributorId], references: [id])
-  createdAt     DateTime     @default(now())
+
+  createdAt DateTime @default(now())
 
   @@index([place])
   @@index([createdAt(sort: Desc)])
   @@index([contributorId])
+  @@index([category])
 }
