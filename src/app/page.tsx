@@ -10,9 +10,8 @@ type PageProps = { searchParams?: SearchParams | Promise<SearchParams> };
 export default async function Home({ searchParams }: PageProps) {
   const sp = await Promise.resolve(searchParams ?? {});
   const place = (sp.place ?? "").trim();
-  const category = (sp.category ?? "").trim(); // "" は「すべて」
+  const category = (sp.category ?? "").trim();
 
-  // 検索ボタンの遷移先（place + category）
   const p = new URLSearchParams();
   if (place) p.set("place", place);
   if (category) p.set("category", category);
@@ -20,23 +19,19 @@ export default async function Home({ searchParams }: PageProps) {
 
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
-      {/* ヘッダー */}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-neutral-200">
         <h1 className="text-2xl font-bold text-neutral-900">Hanami Check</h1>
         <p className="mt-1 text-sm text-neutral-600">花見スポットの今がわかる</p>
       </div>
 
-      {/* ✅ 追加：カテゴリタブ（押せる） */}
       <div className="mt-4">
         <CategoryTabs place={place} selected={category} />
       </div>
 
-      {/* 検索 */}
       <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-neutral-200">
         <p className="text-xs font-semibold text-neutral-600">場所名で探す</p>
 
         <form className="mt-3" action="/" method="get">
-          {/* category は維持 */}
           {category ? <input type="hidden" name="category" value={category} /> : null}
 
           <input
@@ -55,12 +50,21 @@ export default async function Home({ searchParams }: PageProps) {
         </form>
       </section>
 
-      <Link
-        href="/post"
-        className="mt-5 inline-flex w-full items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
-      >
-        投稿する
-      </Link>
+      {/* ✅ 復活：投稿 / マイページ */}
+      <div className="mt-5 grid grid-cols-2 gap-3">
+        <Link
+          href="/post"
+          className="inline-flex w-full items-center justify-center rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800"
+        >
+          投稿する
+        </Link>
+        <Link
+          href="/my"
+          className="inline-flex w-full items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
+        >
+          マイページ
+        </Link>
+      </div>
     </main>
   );
 }

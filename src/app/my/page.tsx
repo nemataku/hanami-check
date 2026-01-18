@@ -1,7 +1,7 @@
 // src/app/my/page.tsx
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
 import { ensureContributorId } from "@/lib/contributor";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,7 @@ export default async function MyPage() {
     prisma.spot.findMany({
       where: { contributorId },
       orderBy: { createdAt: "desc" },
+      take: 50,
     }),
     prisma.spot.aggregate({
       where: { contributorId },
@@ -35,15 +36,11 @@ export default async function MyPage() {
     <main className="mx-auto w-full max-w-md px-4 py-8">
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-neutral-200">
         <h1 className="text-xl font-bold text-neutral-900">マイページ</h1>
-
         <div className="mt-4 flex items-center gap-3">
-          <span
-            className={`${badge.color} rounded-full px-3 py-1 text-xs font-bold text-white`}
-          >
+          <span className={`${badge.color} rounded-full px-3 py-1 text-xs font-bold text-white`}>
             称号：{badge.label}
           </span>
         </div>
-
         <div className="mt-4 grid grid-cols-2 gap-4 border-t pt-4">
           <div className="text-center">
             <p className="text-xs text-neutral-500">総投稿数</p>
@@ -61,10 +58,8 @@ export default async function MyPage() {
 
         {items.map((s) => (
           <div key={s.id} className="rounded-xl border bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              {/* トップに場所を入れているなら不要、という方針なら↓は消してOK */}
-              <p className="font-bold text-neutral-900">{s.place}</p>
-
+            <div className="flex justify-between items-start">
+              <p className="font-bold">{s.place}</p>
               <p className="text-[10px] text-neutral-400">
                 {new Date(s.createdAt).toLocaleDateString("ja-JP")}
               </p>
@@ -78,25 +73,23 @@ export default async function MyPage() {
               />
             ) : null}
 
-            {s.comment ? (
-              <p className="mt-2 text-sm text-neutral-700">{s.comment}</p>
-            ) : null}
+            {s.comment ? <p className="mt-2 text-sm text-neutral-700">{s.comment}</p> : null}
           </div>
         ))}
 
         {items.length === 0 ? (
-          <p className="text-center text-sm text-neutral-400">
-            履歴がありません
-          </p>
+          <p className="text-center text-sm text-neutral-400">履歴がありません</p>
         ) : null}
       </div>
 
-      <Link
-        href="/"
-        className="mt-8 block w-full rounded-xl bg-neutral-900 py-3 text-center text-sm font-bold text-white"
-      >
-        TOPに戻る
-      </Link>
+      <div className="mt-8 space-y-3">
+        <Link
+          href="/"
+          className="block w-full rounded-xl bg-neutral-900 py-3 text-center text-sm font-bold text-white"
+        >
+          TOPに戻る
+        </Link>
+      </div>
     </main>
   );
 }
