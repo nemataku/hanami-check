@@ -60,11 +60,17 @@ const PARK_BIZ_CODE = {
   休業: "HOLIDAY",
 } as const;
 
-const FLOWER_CODE = {
+const FLOWER_PRESET_LABELS = ["桜", "梅", "その他"] as const;
+type FlowerPresetLabel = (typeof FLOWER_PRESET_LABELS)[number];
+
+const FLOWER_CODE: Record<FlowerPresetLabel, "SAKURA" | "UME" | "OTHER"> = {
   桜: "SAKURA",
   梅: "UME",
   その他: "OTHER",
-} as const;
+};
+
+// ✅ "" を許容
+const [flowerPresetLabel, setFlowerPresetLabel] = useState<FlowerPresetLabel | "">("");
 
 type UploadResult =
   | { ok: true; imageUrl: string; imageHash: string; bytes: number }
@@ -218,7 +224,10 @@ export default function SpotForm() {
 
   // ===== APIへ送る値に変換 =====
   const crowdCode = crowdLabel ? CROWD_CODE[crowdLabel] : null;
-  const parkingLevel = parkingLabel ? PARKING_CODE[parkingLabel] : null;
+  const flowerPreset =
+  flowerPresetLabel
+    ? FLOWER_CODE[flowerPresetLabel]
+    : null;
   const businessStatus = businessLabel ? BIZ_CODE[businessLabel] : null;
   const parkBusinessStatus = parkBusinessLabel ? PARK_BIZ_CODE[parkBusinessLabel] : null;
   const foodBusinessStatus = foodBusinessLabel ? BIZ_CODE[foodBusinessLabel] : null;
