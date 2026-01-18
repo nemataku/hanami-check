@@ -1,3 +1,5 @@
+// prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,12 +11,42 @@ datasource db {
 }
 
 enum Category {
-  HANAMI     // 花見（咲き具合 = bloom を使う）
-  SCENIC     // 景勝地（見頃 = condition）
-  FACILITY   // 商業施設（混雑 = crowd）
-  FOOD       // 飲食（混雑 = crowd）
-  EVENT      // イベント（混雑 = crowd）
-  PARKING    // 駐車場（空き = condition）
+  SHOPPING
+  PARK
+  FOOD
+  EVENT
+  PARKING
+  HANAMI
+  SCENIC
+  PUBLIC
+}
+
+enum CrowdLevel {
+  EMPTY        // 空いている
+  LIGHT        // やや混雑
+  CROWDED      // 混雑
+  FULL         // 満員
+  RESTRICTED   // 入場規制
+}
+
+enum ParkingLevel {
+  AVAILABLE    // 空きあり
+  LIGHT        // やや混雑
+  CROWDED      // 混雑
+  FULL         // 満車
+}
+
+enum BusinessStatus {
+  OPEN
+  BREAK
+  CLOSED
+  HOLIDAY
+}
+
+enum FlowerPreset {
+  SAKURA
+  UME
+  OTHER
 }
 
 model Contributor {
@@ -24,30 +56,55 @@ model Contributor {
 }
 
 model Spot {
-  id            Int       @id @default(autoincrement())
-  category      Category  @default(HANAMI)
+  id            Int          @id @default(autoincrement())
 
+  // 共通
+  category      Category     @default(HANAMI)
   place         String
-  bloom         Int       @default(0) // 花見専用（0..6）
+
+  // 花見（既存）
+  bloom         Int?         // 0..6（花見のみ必須扱い）
   weather       String?
 
-  // 1..5：景勝地の見頃 / 駐車場の空き 等（カテゴリによって意味が変わる）
-  condition     Int       @default(3)
-
-  // 1..5：混雑度
-  crowd         Int       @default(3)
-
+  // 共通（既存）
   comment       String?
   imageUrl      String?
   imageHash     String?
 
+  // 混雑（多くのカテゴリで使用）
+  crowd         CrowdLevel?
+
+  // 駐車場
+  parkingLevel  ParkingLevel?
+  parkingName   String?
+
+  // 商業施設 / 飲食 / 公園
+  shopName        String?
+  attractionName  String?
+  businessStatus  BusinessStatus?
+  openTime        String?   // "HH:mm"
+  closeTime       String?   // "HH:mm"
+
+  // 待ち時間（公園・公共施設）
+  waitMinutes   Int?
+
+  // イベント
+  eventName     String?
+  eventStart    String?     // "HH:mm"
+  eventEnd      String?     // "HH:mm"
+
+  // 花見：花の種類
+  flowerPreset  FlowerPreset?
+  flowerOther   String?
+
+  // 投稿者
   contributorId String?
   contributor   Contributor? @relation(fields: [contributorId], references: [id])
 
-  createdAt DateTime @default(now())
+  createdAt     DateTime     @default(now())
 
   @@index([place])
+  @@index([category])
   @@index([createdAt(sort: Desc)])
   @@index([contributorId])
-  @@index([category])
 }

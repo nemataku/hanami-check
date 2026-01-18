@@ -5,25 +5,66 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 const CATEGORIES = [
-  { key: "MALL", label: "商業施設" },
+  { key: "SHOPPING", label: "商業施設" },
   { key: "PARK", label: "公園・テーマパーク" },
   { key: "FOOD", label: "飲食" },
   { key: "EVENT", label: "イベント" },
   { key: "PARKING", label: "駐車場" },
   { key: "HANAMI", label: "花見" },
-  { key: "SCENIC", label: "景勝地" },
+  { key: "SCENIC", label: "観光地・景勝地" },
   { key: "PUBLIC", label: "公共施設" },
 ] as const;
 
 type CategoryKey = (typeof CATEGORIES)[number]["key"];
 
+// ===== 表示用（日本語） =====
 const BLOOM_LABELS = ["つぼみ", "咲始め", "3分咲き", "5分咲き", "7分咲き", "満開", "散る"] as const;
 const WEATHER_OPTIONS = ["晴れ", "曇り", "小雨", "雨", "雪"] as const;
 
-const CROWD_5 = ["空いている", "やや混雑", "混雑", "満員", "入場規制"] as const;
-const PARKING_4 = ["空きあり", "やや混雑", "混雑", "満車"] as const;
-const BUSINESS_STATUS = ["営業中", "休憩中", "営業時間外", "休業"] as const;
-const PARK_STATUS = ["営業中", "営業時間外", "休業"] as const;
+const CROWD_LABELS = ["空いている", "やや混雑", "混雑", "満員", "入場規制"] as const;
+const PARKING_LABELS = ["空きあり", "やや混雑", "混雑", "満車"] as const;
+
+const BUSINESS_LABELS = ["営業中", "休憩中", "営業時間外", "休業"] as const;
+const PARK_BUSINESS_LABELS = ["営業中", "営業時間外", "休業"] as const;
+
+// 花の種類（花見）
+const FLOWER_PRESET_LABELS = ["桜", "梅", "その他"] as const;
+type FlowerPresetLabel = (typeof FLOWER_PRESET_LABELS)[number] | "";
+
+// ===== API用（コード） =====
+const CROWD_CODE = {
+  空いている: "EMPTY",
+  やや混雑: "LIGHT",
+  混雑: "CROWDED",
+  満員: "FULL",
+  入場規制: "RESTRICTED",
+} as const;
+
+const PARKING_CODE = {
+  空きあり: "AVAILABLE",
+  やや混雑: "LIGHT",
+  混雑: "CROWDED",
+  満車: "FULL",
+} as const;
+
+const BIZ_CODE = {
+  営業中: "OPEN",
+  休憩中: "BREAK",
+  営業時間外: "CLOSED",
+  休業: "HOLIDAY",
+} as const;
+
+const PARK_BIZ_CODE = {
+  営業中: "OPEN",
+  営業時間外: "CLOSED",
+  休業: "HOLIDAY",
+} as const;
+
+const FLOWER_CODE = {
+  桜: "SAKURA",
+  梅: "UME",
+  その他: "OTHER",
+} as const;
 
 type UploadResult =
   | { ok: true; imageUrl: string; imageHash: string; bytes: number }
@@ -62,29 +103,34 @@ export default function SpotForm() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageHash, setImageHash] = useState<string | null>(null);
 
-  // 花見用
+  // 花見
   const [bloom, setBloom] = useState<number>(3);
   const [weather, setWeather] = useState<(typeof WEATHER_OPTIONS)[number] | "">("");
 
-  // 混雑（多カテゴリで使う）
-  const [crowd5, setCrowd5] = useState<(typeof CROWD_5)[number] | "">("");
+  // 花の種類（花見）
+  const [flowerPresetLabel, setFlowerPresetLabel] = useState<FlowerPresetLabel>("");
+  const [flowerOther, setFlowerOther] = useState("");
 
-  // 駐車場用
-  const [parking4, setParking4] = useState<(typeof PARKING_4)[number] | "">("");
+  // 混雑（多カテゴリで使う）
+  const [crowdLabel, setCrowdLabel] = useState<(typeof CROWD_LABELS)[number] | "">("");
+
+  // 駐車場
+  const [parkingLabel, setParkingLabel] = useState<(typeof PARKING_LABELS)[number] | "">("");
+  const [parkingName, setParkingName] = useState("");
 
   // 商業施設
   const [shopName, setShopName] = useState("");
-  const [businessStatus, setBusinessStatus] = useState<(typeof BUSINESS_STATUS)[number] | "">("");
+  const [businessLabel, setBusinessLabel] = useState<(typeof BUSINESS_LABELS)[number] | "">("");
   const [openTime, setOpenTime] = useState(""); // "09:00"
   const [closeTime, setCloseTime] = useState(""); // "18:00"
 
   // 公園・テーマパーク
   const [attractionName, setAttractionName] = useState("");
   const [waitMinutes, setWaitMinutes] = useState(""); // number string
-  const [parkStatus, setParkStatus] = useState<(typeof PARK_STATUS)[number] | "">("");
+  const [parkBusinessLabel, setParkBusinessLabel] = useState<(typeof PARK_BUSINESS_LABELS)[number] | "">("");
 
   // 飲食
-  const [foodStatus, setFoodStatus] = useState<(typeof BUSINESS_STATUS)[number] | "">("");
+  const [foodBusinessLabel, setFoodBusinessLabel] = useState<(typeof BUSINESS_LABELS)[number] | "">("");
   const [foodOpen, setFoodOpen] = useState("");
   const [foodClose, setFoodClose] = useState("");
 
@@ -170,6 +216,20 @@ export default function SpotForm() {
     await uploadImage(f);
   }
 
+  // ===== APIへ送る値に変換 =====
+  const crowdCode = crowdLabel ? CROWD_CODE[crowdLabel] : null;
+  const parkingLevel = parkingLabel ? PARKING_CODE[parkingLabel] : null;
+  const businessStatus = businessLabel ? BIZ_CODE[businessLabel] : null;
+  const parkBusinessStatus = parkBusinessLabel ? PARK_BIZ_CODE[parkBusinessLabel] : null;
+  const foodBusinessStatus = foodBusinessLabel ? BIZ_CODE[foodBusinessLabel] : null;
+
+  const flowerPreset =
+    flowerPresetLabel && flowerPresetLabel !== ""
+      ? FLOWER_CODE[flowerPresetLabel]
+      : null;
+
+  const flowerOtherTrim = flowerOther.trim() === "" ? null : flowerOther.trim();
+
   const canSubmit = useMemo(() => {
     if (!category) return false;
     if (!place.trim()) return false;
@@ -177,34 +237,39 @@ export default function SpotForm() {
     if (file && !imageUrl) return false;
 
     // カテゴリ別必須
-    if (category === "MALL") {
-      if (businessStatus === "") return false;
-      if (crowd5 === "") return false;
+    if (category === "SHOPPING") {
+      if (!businessStatus) return false;
+      if (!crowdCode) return false;
     }
     if (category === "PARK") {
-      if (crowd5 === "") return false;
-      if (parkStatus === "") return false;
+      if (!crowdCode) return false;
+      if (!parkBusinessStatus) return false;
     }
     if (category === "FOOD") {
-      if (crowd5 === "") return false;
-      if (foodStatus === "") return false;
+      if (!crowdCode) return false;
+      if (!foodBusinessStatus) return false;
     }
     if (category === "EVENT") {
       if (!eventName.trim()) return false;
-      if (crowd5 === "") return false;
+      if (!crowdCode) return false;
     }
     if (category === "PARKING") {
-      if (parking4 === "") return false;
+      if (!parkingLevel) return false;
     }
     if (category === "HANAMI") {
       if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) return false;
-      if (crowd5 === "") return false;
+      if (!crowdCode) return false;
+      // 花の種類：preset or other 必須
+      const hasFlower = !!flowerPreset || !!flowerOtherTrim;
+      if (!hasFlower) return false;
+      // その他を選んだ場合は自由記入も必須にする（仕様通り）
+      if (flowerPresetLabel === "その他" && !flowerOtherTrim) return false;
     }
     if (category === "SCENIC") {
-      if (crowd5 === "") return false;
+      if (!crowdCode) return false;
     }
     if (category === "PUBLIC") {
-      if (crowd5 === "") return false;
+      if (!crowdCode) return false;
     }
 
     return true;
@@ -216,12 +281,15 @@ export default function SpotForm() {
     file,
     imageUrl,
     businessStatus,
-    crowd5,
-    parkStatus,
-    foodStatus,
-    eventName,
-    parking4,
+    parkBusinessStatus,
+    foodBusinessStatus,
+    crowdCode,
+    parkingLevel,
     bloom,
+    eventName,
+    flowerPreset,
+    flowerOtherTrim,
+    flowerPresetLabel,
   ]);
 
   async function onSubmit() {
@@ -244,68 +312,78 @@ export default function SpotForm() {
 
     setSubmitting(true);
     try {
-      // ✅ とりあえず payload に載せる（API/DBは次ステップで拡張）
       const payload: Record<string, unknown> = {
-        category,
+        category, // APIは "SHOPPING" などを受ける
         place: placeTrim,
         comment: comment.trim() === "" ? null : comment.trim(),
         imageUrl,
         imageHash,
       };
 
-      if (category === "MALL") {
+      // SHOPPING（商業施設）
+      if (category === "SHOPPING") {
         payload.shopName = shopName.trim() === "" ? null : shopName.trim();
-        payload.status = businessStatus;
+        payload.businessStatus = businessStatus; // OPEN/BREAK/CLOSED/HOLIDAY
         payload.openTime = openTime || null;
         payload.closeTime = closeTime || null;
-        payload.crowd = crowd5;
+        payload.crowd = crowdCode; // EMPTY/LIGHT/...
       }
 
+      // PARK（公園・テーマパーク）
       if (category === "PARK") {
         payload.attractionName = attractionName.trim() === "" ? null : attractionName.trim();
-        payload.crowd = crowd5;
         payload.waitMinutes = waitMinutes.trim() === "" ? null : Number(waitMinutes);
-        payload.status = parkStatus;
+        payload.businessStatus = parkBusinessStatus; // OPEN/CLOSED/HOLIDAY
         payload.openTime = openTime || null;
         payload.closeTime = closeTime || null;
         payload.weather = weather === "" ? null : weather;
+        payload.crowd = crowdCode;
       }
 
+      // FOOD（飲食）
       if (category === "FOOD") {
-        payload.crowd = crowd5;
-        payload.status = foodStatus;
+        payload.businessStatus = foodBusinessStatus;
         payload.openTime = foodOpen || null;
         payload.closeTime = foodClose || null;
+        payload.crowd = crowdCode;
       }
 
+      // EVENT（イベント）
       if (category === "EVENT") {
         payload.eventName = eventName.trim();
-        payload.crowd = crowd5;
         payload.eventStart = eventStart || null;
         payload.eventEnd = eventEnd || null;
+        payload.crowd = crowdCode;
       }
 
+      // PARKING（駐車場）
       if (category === "PARKING") {
-        payload.parkingName = shopName.trim() === "" ? null : shopName.trim();
-        payload.crowd = parking4;
+        payload.parkingName = parkingName.trim() === "" ? null : parkingName.trim();
+        payload.parkingLevel = parkingLevel; // AVAILABLE/LIGHT/CROWDED/FULL
+        // crowd は使わない（APIも parkingLevel を見てる）
       }
 
+      // HANAMI（花見）
       if (category === "HANAMI") {
         payload.bloom = bloom;
         payload.weather = weather === "" ? null : weather;
-        payload.crowd = crowd5;
+        payload.crowd = crowdCode;
+        payload.flowerPreset = flowerPreset; // SAKURA/UME/OTHER
+        payload.flowerOther = flowerOtherTrim; // string | null
       }
 
+      // SCENIC（観光地・景勝地）
       if (category === "SCENIC") {
-        payload.crowd = crowd5;
         payload.weather = weather === "" ? null : weather;
+        payload.crowd = crowdCode;
       }
 
+      // PUBLIC（公共施設）
       if (category === "PUBLIC") {
-        payload.crowd = crowd5;
         payload.openTime = publicOpen || null;
         payload.closeTime = publicClose || null;
         payload.waitMinutes = publicWait.trim() === "" ? null : Number(publicWait);
+        payload.crowd = crowdCode;
       }
 
       const res = await fetch("/api/spots", {
@@ -344,7 +422,7 @@ export default function SpotForm() {
         <p className="mt-1 text-xs text-neutral-600">カテゴリを選んで、必要事項を入力してください</p>
       </div>
 
-      {/* ✅ カテゴリ選択 */}
+      {/* カテゴリ選択 */}
       <section className="mt-5 rounded-2xl border border-neutral-200 bg-white p-4">
         <label className="text-sm font-semibold text-neutral-900">カテゴリ（必須）</label>
         <div className="mt-3 flex flex-wrap gap-2">
@@ -367,15 +445,13 @@ export default function SpotForm() {
         <input
           value={place}
           onChange={(e) => setPlace(e.target.value)}
-          placeholder="例：上野公園 / ららぽーと / ◯◯駐車場"
+          placeholder="例：ららぽーと / 上野公園 / ◯◯東京駅店 / 浅草寺 / ◯◯区役所"
           className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
         />
       </section>
 
-      {/* --- カテゴリ別 UI --- */}
-
-      {/* 商業施設 */}
-      {category === "MALL" ? (
+      {/* ===== 商業施設 ===== */}
+      {category === "SHOPPING" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">店舗名（任意）</label>
@@ -390,8 +466,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              {BUSINESS_STATUS.map((v) => (
-                <button key={v} type="button" onClick={() => setBusinessStatus(v)} className={pill(businessStatus === v)}>
+              {BUSINESS_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setBusinessLabel(v)} className={pill(businessLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -410,12 +486,12 @@ export default function SpotForm() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
-                {crowd5 === "" ? "-" : crowd5}
+                {crowdLabel === "" ? "-" : crowdLabel}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -424,7 +500,7 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 公園・テーマパーク */}
+      {/* ===== 公園・テーマパーク ===== */}
       {category === "PARK" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -451,8 +527,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              {PARK_STATUS.map((v) => (
-                <button key={v} type="button" onClick={() => setParkStatus(v)} className={pill(parkStatus === v)}>
+              {PARK_BUSINESS_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setParkBusinessLabel(v)} className={pill(parkBusinessLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -490,12 +566,12 @@ export default function SpotForm() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
-                {crowd5 === "" ? "-" : crowd5}
+                {crowdLabel === "" ? "-" : crowdLabel}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -504,14 +580,14 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 飲食 */}
+      {/* ===== 飲食 ===== */}
       {category === "FOOD" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              {BUSINESS_STATUS.map((v) => (
-                <button key={v} type="button" onClick={() => setFoodStatus(v)} className={pill(foodStatus === v)}>
+              {BUSINESS_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setFoodBusinessLabel(v)} className={pill(foodBusinessLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -530,12 +606,12 @@ export default function SpotForm() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
-                {crowd5 === "" ? "-" : crowd5}
+                {crowdLabel === "" ? "-" : crowdLabel}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -544,7 +620,7 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* イベント */}
+      {/* ===== イベント ===== */}
       {category === "EVENT" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -569,12 +645,12 @@ export default function SpotForm() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
-                {crowd5 === "" ? "-" : crowd5}
+                {crowdLabel === "" ? "-" : crowdLabel}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -583,14 +659,14 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 駐車場 */}
+      {/* ===== 駐車場 ===== */}
       {category === "PARKING" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">駐車場名（任意）</label>
             <input
-              value={shopName}
-              onChange={(e) => setShopName(e.target.value)}
+              value={parkingName}
+              onChange={(e) => setParkingName(e.target.value)}
               className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm"
               placeholder="例：第1駐車場"
             />
@@ -600,12 +676,12 @@ export default function SpotForm() {
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold text-neutral-900">混雑具合（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
-                {parking4 === "" ? "-" : parking4}
+                {parkingLabel === "" ? "-" : parkingLabel}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {PARKING_4.map((v) => (
-                <button key={v} type="button" onClick={() => setParking4(v)} className={pill(parking4 === v)}>
+              {PARKING_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setParkingLabel(v)} className={pill(parkingLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -614,9 +690,37 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 花見 */}
+      {/* ===== 花見 ===== */}
       {category === "HANAMI" ? (
         <div className="mt-4 space-y-4">
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+            <label className="text-sm font-semibold text-neutral-900">花の種類（必須）</label>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => { setFlowerPresetLabel(""); }} className={pill(flowerPresetLabel === "")}>
+                未選択
+              </button>
+              {FLOWER_PRESET_LABELS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setFlowerPresetLabel(v)}
+                  className={pill(flowerPresetLabel === v)}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+
+            {flowerPresetLabel === "その他" ? (
+              <input
+                value={flowerOther}
+                onChange={(e) => setFlowerOther(e.target.value)}
+                placeholder="例：菜の花 / 藤 など"
+                className="mt-3 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+              />
+            ) : null}
+          </section>
+
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">開花状況（必須）</label>
             <div className="mt-3 grid grid-cols-3 gap-2">
@@ -645,8 +749,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -655,7 +759,7 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 景勝地 */}
+      {/* ===== 観光地・景勝地 ===== */}
       {category === "SCENIC" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -675,8 +779,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -685,7 +789,7 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 公共施設 */}
+      {/* ===== 公共施設 ===== */}
       {category === "PUBLIC" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -710,8 +814,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              {CROWD_5.map((v) => (
-                <button key={v} type="button" onClick={() => setCrowd5(v)} className={pill(crowd5 === v)}>
+              {CROWD_LABELS.map((v) => (
+                <button key={v} type="button" onClick={() => setCrowdLabel(v)} className={pill(crowdLabel === v)}>
                   {v}
                 </button>
               ))}
@@ -795,7 +899,6 @@ export default function SpotForm() {
           {submitting ? "投稿中..." : "投稿する"}
         </button>
 
-        {/* ✅ 復活：TOPに戻る */}
         <Link
           href="/"
           className="inline-flex w-full items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
