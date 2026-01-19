@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 const CATEGORIES = [
-  { key: "MALL", label: "商業施設" },
+  { key: "SHOPPING", label: "商業施設" }, // ← MALL から変更
   { key: "PARK", label: "公園・テーマパーク" },
   { key: "FOOD", label: "飲食" },
   { key: "EVENT", label: "イベント" },
@@ -306,7 +306,7 @@ export default function SpotForm() {
         imageHash,
       };
 
-      if (category === "MALL") {
+      if (category === "SHOPPING") {
         payload.shopName = shopName.trim() === "" ? null : shopName.trim();
         payload.businessStatus = businessStatus;
         payload.openTime = openTime || null;
