@@ -194,7 +194,7 @@ export default function SpotForm() {
 
   // ✅ 場所名 placeholder（カテゴリ別）
   const placePlaceholder = useMemo(() => {
-    if (category === "MALL") return "例：ららぽーと";
+    if (category === "SHOPPING") return "例：ららぽーと";
     if (category === "PARK") return "例：上野公園";
     if (category === "FOOD") return "例：◯◯◯東京駅店";
     if (category === "EVENT") return "例：上野公園 / 武道館";
@@ -204,7 +204,7 @@ export default function SpotForm() {
     if (category === "PUBLIC") return "例：◯◯区役所 / ◯◯大学";
     return "例：上野公園 / ららぽーと / ◯◯駐車場";
   }, [category]);
-
+  
   const canSubmit = useMemo(() => {
     if (!category) return false;
     if (!place.trim()) return false;
@@ -446,7 +446,8 @@ export default function SpotForm() {
         <input
           value={place}
           onChange={(e) => setPlace(e.target.value)}
-          placeholder={placePlaceholder}
+        - placeholder="例：上野公園 / ららぽーと / ◯◯駐車場"
+        + placeholder={placePlaceholder}
           className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
         />
       </section>
