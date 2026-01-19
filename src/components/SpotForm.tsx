@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 const CATEGORIES = [
-  { key: "SHOPPING", label: "商業施設" }, // ← MALL から変更
+  { key: "SHOPPING", label: "商業施設" },
   { key: "PARK", label: "公園・テーマパーク" },
   { key: "FOOD", label: "飲食" },
   { key: "EVENT", label: "イベント" },
@@ -194,17 +194,28 @@ export default function SpotForm() {
 
   // ✅ 場所名 placeholder（カテゴリ別）
   const placePlaceholder = useMemo(() => {
-    if (category === "SHOPPING") return "例：ららぽーと";
-    if (category === "PARK") return "例：上野公園";
-    if (category === "FOOD") return "例：◯◯◯東京駅店";
-    if (category === "EVENT") return "例：上野公園 / 武道館";
-    if (category === "PARKING") return "例：ららぽーと / 羽田空港";
-    if (category === "HANAMI") return "例：上野公園";
-    if (category === "SCENIC") return "例：浅草寺 / 東京スカイツリー";
-    if (category === "PUBLIC") return "例：◯◯区役所 / ◯◯大学";
-    return "例：上野公園 / ららぽーと / ◯◯駐車場";
+    switch (category) {
+      case "SHOPPING":
+        return "例：ららぽーと";
+      case "PARK":
+        return "例：上野公園";
+      case "FOOD":
+        return "例：◯◯◯東京駅店";
+      case "EVENT":
+        return "例：上野公園 / 武道館";
+      case "PARKING":
+        return "例：ららぽーと / 羽田空港";
+      case "HANAMI":
+        return "例：上野公園";
+      case "SCENIC":
+        return "例：浅草寺 / 東京スカイツリー";
+      case "PUBLIC":
+        return "例：◯◯区役所 / ◯◯大学";
+      default:
+        return "例：上野公園 / ららぽーと / ◯◯駐車場";
+    }
   }, [category]);
-  
+
   const canSubmit = useMemo(() => {
     if (!category) return false;
     if (!place.trim()) return false;
@@ -212,7 +223,7 @@ export default function SpotForm() {
     if (file && !imageUrl) return false;
 
     // カテゴリ別必須
-    if (category === "MALL") {
+    if (category === "SHOPPING") {
       if (businessStatus === "") return false;
       if (crowd5 === "") return false;
     }
@@ -446,8 +457,7 @@ export default function SpotForm() {
         <input
           value={place}
           onChange={(e) => setPlace(e.target.value)}
-        - placeholder="例：上野公園 / ららぽーと / ◯◯駐車場"
-        + placeholder={placePlaceholder}
+          placeholder={placePlaceholder}
           className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
         />
       </section>
@@ -455,7 +465,7 @@ export default function SpotForm() {
       {/* --- カテゴリ別 UI --- */}
 
       {/* 商業施設 */}
-      {category === "MALL" ? (
+      {category === "SHOPPING" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">店舗名（任意）</label>
@@ -557,8 +567,18 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input
+                type="time"
+                value={openTime}
+                onChange={(e) => setOpenTime(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
+              <input
+                type="time"
+                value={closeTime}
+                onChange={(e) => setCloseTime(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
             </div>
           </section>
 
@@ -616,8 +636,18 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={foodOpen} onChange={(e) => setFoodOpen(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={foodClose} onChange={(e) => setFoodClose(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input
+                type="time"
+                value={foodOpen}
+                onChange={(e) => setFoodOpen(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
+              <input
+                type="time"
+                value={foodClose}
+                onChange={(e) => setFoodClose(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
             </div>
           </section>
 
@@ -655,8 +685,18 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">イベント時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={eventStart} onChange={(e) => setEventStart(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={eventEnd} onChange={(e) => setEventEnd(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input
+                type="time"
+                value={eventStart}
+                onChange={(e) => setEventStart(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
+              <input
+                type="time"
+                value={eventEnd}
+                onChange={(e) => setEventEnd(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
             </div>
           </section>
 
@@ -814,8 +854,18 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={publicOpen} onChange={(e) => setPublicOpen(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={publicClose} onChange={(e) => setPublicClose(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input
+                type="time"
+                value={publicOpen}
+                onChange={(e) => setPublicOpen(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
+              <input
+                type="time"
+                value={publicClose}
+                onChange={(e) => setPublicClose(e.target.value)}
+                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
+              />
             </div>
           </section>
 
