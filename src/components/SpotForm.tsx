@@ -22,6 +22,7 @@ const WEATHER_OPTIONS = ["晴れ", "曇り", "小雨", "雨", "雪"] as const;
 
 const CROWD_5 = ["空いている", "やや混雑", "混雑", "満員", "入場規制"] as const;
 const PARKING_4 = ["空きあり", "やや混雑", "混雑", "満車"] as const;
+
 const BUSINESS_STATUS = ["営業中", "休憩中", "営業時間外", "休業"] as const;
 const PARK_STATUS = ["営業中", "営業時間外", "休業"] as const;
 
@@ -245,9 +246,7 @@ export default function SpotForm() {
     if (category === "HANAMI") {
       if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) return false;
       if (crowd5 === "") return false;
-      // ✅ 花の種類：preset か other のどちらか必須
       if (!flowerPreset && !flowerOtherValue) return false;
-      // ✅ other選択時は文字必須
       if (flowerPresetLabel === "その他" && !flowerOtherValue) return false;
     }
     if (category === "SCENIC") {
@@ -295,7 +294,6 @@ export default function SpotForm() {
       return;
     }
 
-    // HANAMI 花の種類必須
     if (category === "HANAMI") {
       if (!flowerPreset && !flowerOtherValue) {
         setFormError("花の種類（桜/梅/その他 or 自由記入）が必須です");
@@ -481,12 +479,7 @@ export default function SpotForm() {
             <label className="text-sm font-semibold text-neutral-900">営業状況（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
               {BUSINESS_STATUS.map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setBusinessStatus(v)}
-                  className={pill(businessStatus === v)}
-                >
+                <button key={v} type="button" onClick={() => setBusinessStatus(v)} className={pill(businessStatus === v)}>
                   {v}
                 </button>
               ))}
@@ -496,18 +489,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                type="time"
-                value={openTime}
-                onChange={(e) => setOpenTime(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
-              <input
-                type="time"
-                value={closeTime}
-                onChange={(e) => setCloseTime(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
+              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
             </div>
           </section>
 
@@ -567,18 +550,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                type="time"
-                value={openTime}
-                onChange={(e) => setOpenTime(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
-              <input
-                type="time"
-                value={closeTime}
-                onChange={(e) => setCloseTime(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
+              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
             </div>
           </section>
 
@@ -636,18 +609,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                type="time"
-                value={foodOpen}
-                onChange={(e) => setFoodOpen(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
-              <input
-                type="time"
-                value={foodClose}
-                onChange={(e) => setFoodClose(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
+              <input type="time" value={foodOpen} onChange={(e) => setFoodOpen(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input type="time" value={foodClose} onChange={(e) => setFoodClose(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
             </div>
           </section>
 
@@ -685,18 +648,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">イベント時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                type="time"
-                value={eventStart}
-                onChange={(e) => setEventStart(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
-              <input
-                type="time"
-                value={eventEnd}
-                onChange={(e) => setEventEnd(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
+              <input type="time" value={eventStart} onChange={(e) => setEventStart(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input type="time" value={eventEnd} onChange={(e) => setEventEnd(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
             </div>
           </section>
 
@@ -854,18 +807,8 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <input
-                type="time"
-                value={publicOpen}
-                onChange={(e) => setPublicOpen(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
-              <input
-                type="time"
-                value={publicClose}
-                onChange={(e) => setPublicClose(e.target.value)}
-                className="rounded-xl border border-neutral-200 px-3 py-2 text-sm"
-              />
+              <input type="time" value={publicOpen} onChange={(e) => setPublicOpen(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+              <input type="time" value={publicClose} onChange={(e) => setPublicClose(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
             </div>
           </section>
 
