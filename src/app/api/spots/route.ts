@@ -25,6 +25,9 @@ const PARKING = ["AVAILABLE", "LIGHT", "CROWDED", "FULL"] as const;
 const BIZ = ["OPEN", "BREAK", "CLOSED", "HOLIDAY"] as const;
 const FLOWER = ["SAKURA", "UME", "OTHER"] as const;
 
+// ★追加：天気を許容値でバリデーション（必須カテゴリあり）
+const WEATHER = ["晴れ", "曇り", "小雨", "雨", "雪"] as const;
+
 type Category = (typeof CATEGORIES)[number];
 
 function isOneOf<T extends readonly string[]>(
@@ -64,7 +67,7 @@ export async function GET(req: Request) {
         ? { place: { contains: place, mode: "insensitive" } }
         : undefined,
       orderBy: { createdAt: "desc" },
-      take: place ? 5 : 20,
+      take: 5, // ★ 常に最新5件だけ返す
     });
 
     return NextResponse.json({ ok: true, items });
@@ -110,12 +113,13 @@ export async function POST(req: Request) {
       );
     }
 
-    // カテゴリ別入力（共通候補）
+    // ===== 共通候補（カテゴリによって使う/使わないは後で null 化する） =====
     const crowd = isOneOf(body.crowd, CROWD) ? body.crowd : null;
 
     const businessStatus = isOneOf(body.businessStatus, BIZ)
       ? body.businessStatus
       : null;
+
     const openTime = normalizeHHMM(body.openTime);
     const closeTime = normalizeHHMM(body.closeTime);
 
@@ -148,14 +152,16 @@ export async function POST(req: Request) {
         ? null
         : String(body.parkingName).trim();
 
-    // 花見（既存）
+    // 花見
     const bloomRaw = body.bloom;
-    const bloom = bloomRaw == null || bloomRaw === "" ? null : Number(bloomRaw);
-    const weather = body.weather == null || body.weather === ""
-      ? null
-      : String(body.weather);
+    const bloom =
+      bloomRaw == null || bloomRaw === "" ? null : Number(bloomRaw);
 
-    // ✅ ここが今回の修正点：UIのキー名揺れを吸収
+    // 天気（必須カテゴリあり）
+    const weatherRaw = body.weather;
+    const weather = isOneOf(weatherRaw, WEATHER) ? weatherRaw : null;
+
+    // UIのキー名揺れを吸収
     const flowerPresetRaw = body.flowerPreset ?? body.flowerType;
     const flowerPreset = isOneOf(flowerPresetRaw, FLOWER)
       ? flowerPresetRaw
@@ -168,10 +174,104 @@ export async function POST(req: Request) {
         : String(flowerOtherRaw).trim();
 
     // ===== カテゴリ別必須バリデーション =====
+    if (category === "SHOPPING") {
+      if (!businessStatus) {
+        return NextResponse.json(
+          { ok: false, error: "営業状況は必須です" },
+          { status: 400 }
+        );
+      }
+      if (!crowd) {
+        return NextResponse.json(
+          { ok: false, error: "混雑状況は必須です" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (category === "PARK") {
+      if (!businessStatus) {
+        return NextResponse.json(
+          { ok: false, error: "営業状況は必須です" },
+          { status: 400 }
+        );
+      }
+      if (!weather) {
+        return NextResponse.json(
+          { ok: false, error: "天気は必須です" },
+          { status: 400 }
+        );
+      }
+      if (!crowd) {
+        return NextResponse.json(
+          { ok: false, error: "混雑状況は必須です" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (category === "FOOD") {
+      if (!businessStatus) {
+        return NextResponse.json(
+          { ok: false, error: "営業状況は必須です" },
+          { status: 400 }
+        );
+      }
+      if (!crowd) {
+        return NextResponse.json(
+          { ok: false, error: "混雑状況は必須です" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (category === "EVENT") {
+      if (!eventName) {
+        return NextResponse.json(
+          { ok: false, error: "イベント名は必須です" },
+          { status: 400 }
+        );
+      }
+      // ★必須化：イベント時間
+      if (!eventStart || !eventEnd) {
+        return NextResponse.json(
+          { ok: false, error: "イベント時間は必須です" },
+          { status: 400 }
+        );
+      }
+      if (!crowd) {
+        return NextResponse.json(
+          { ok: false, error: "混雑状況は必須です" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (category === "PARKING") {
+      if (!parkingLevel) {
+        return NextResponse.json(
+          { ok: false, error: "混雑状況（駐車場）は必須です" },
+          { status: 400 }
+        );
+      }
+    }
+
     if (category === "HANAMI") {
-      if (!Number.isInteger(bloom) || (bloom as number) < 0 || (bloom as number) > 6) {
+      if (
+        !Number.isInteger(bloom) ||
+        (bloom as number) < 0 ||
+        (bloom as number) > 6
+      ) {
         return NextResponse.json(
           { ok: false, error: "開花状況（bloom）が不正です" },
+          { status: 400 }
+        );
+      }
+
+      // ★必須化：天気
+      if (!weather) {
+        return NextResponse.json(
+          { ok: false, error: "天気は必須です" },
           { status: 400 }
         );
       }
@@ -193,76 +293,14 @@ export async function POST(req: Request) {
       }
     }
 
-    if (category === "SHOPPING") {
-      if (!businessStatus) {
-        return NextResponse.json(
-          { ok: false, error: "営業状況は必須です" },
-          { status: 400 }
-        );
-      }
-      if (!crowd) {
-        return NextResponse.json(
-          { ok: false, error: "混雑状況は必須です" },
-          { status: 400 }
-        );
-      }
-    }
-
-    if (category === "PARK") {
-      if (!crowd) {
-        return NextResponse.json(
-          { ok: false, error: "混雑状況は必須です" },
-          { status: 400 }
-        );
-      }
-      if (!businessStatus) {
-        return NextResponse.json(
-          { ok: false, error: "営業状況は必須です" },
-          { status: 400 }
-        );
-      }
-    }
-
-    if (category === "FOOD") {
-      if (!crowd) {
-        return NextResponse.json(
-          { ok: false, error: "混雑状況は必須です" },
-          { status: 400 }
-        );
-      }
-      if (!businessStatus) {
-        return NextResponse.json(
-          { ok: false, error: "営業状況は必須です" },
-          { status: 400 }
-        );
-      }
-    }
-
-    if (category === "EVENT") {
-      if (!eventName) {
-        return NextResponse.json(
-          { ok: false, error: "イベント名は必須です" },
-          { status: 400 }
-        );
-      }
-      if (!crowd) {
-        return NextResponse.json(
-          { ok: false, error: "混雑状況は必須です" },
-          { status: 400 }
-        );
-      }
-    }
-
-    if (category === "PARKING") {
-      if (!parkingLevel) {
-        return NextResponse.json(
-          { ok: false, error: "混雑具合（駐車場）は必須です" },
-          { status: 400 }
-        );
-      }
-    }
-
     if (category === "SCENIC") {
+      // ★必須化：天気
+      if (!weather) {
+        return NextResponse.json(
+          { ok: false, error: "天気は必須です" },
+          { status: 400 }
+        );
+      }
       if (!crowd) {
         return NextResponse.json(
           { ok: false, error: "混雑状況は必須です" },
@@ -272,6 +310,13 @@ export async function POST(req: Request) {
     }
 
     if (category === "PUBLIC") {
+      // ★必須化：天気
+      if (!weather) {
+        return NextResponse.json(
+          { ok: false, error: "天気は必須です" },
+          { status: 400 }
+        );
+      }
       if (!crowd) {
         return NextResponse.json(
           { ok: false, error: "混雑状況は必須です" },
@@ -295,46 +340,79 @@ export async function POST(req: Request) {
       create: { id: contributorId },
     });
 
-    const created = await prisma.spot.create({
-      data: {
-        category,
-        place,
+    // ===== カテゴリに関係ない値はDBに入れない（検索結果に混ざるのを防ぐ） =====
+    const data = {
+      category,
+      place,
 
-        bloom: category === "HANAMI" ? (bloom as number) : bloom,
-        weather,
+      comment,
+      imageUrl,
+      imageHash,
 
-        comment,
-        imageUrl,
-        imageHash,
+      // 共通（カテゴリで使うものだけ残す）
+      crowd:
+        category === "SHOPPING" ||
+          category === "PARK" ||
+          category === "FOOD" ||
+          category === "EVENT" ||
+          category === "HANAMI" ||
+          category === "SCENIC" ||
+          category === "PUBLIC"
+          ? crowd
+          : null,
 
-        crowd,
+      // 天気（必須カテゴリのみ保存）
+      weather:
+        category === "PARK" ||
+          category === "HANAMI" ||
+          category === "SCENIC" ||
+          category === "PUBLIC"
+          ? weather
+          : null,
 
-        businessStatus,
-        openTime,
-        closeTime,
-        shopName,
-        attractionName,
+      // 商業施設 / 飲食 / 公園（※公園も businessStatus を使う設計）
+      businessStatus:
+        category === "SHOPPING" || category === "PARK" || category === "FOOD"
+          ? businessStatus
+          : null,
 
-        waitMinutes,
+      openTime:
+        category === "SHOPPING" || category === "PARK" || category === "FOOD" || category === "PUBLIC"
+          ? openTime
+          : null,
+      closeTime:
+        category === "SHOPPING" || category === "PARK" || category === "FOOD" || category === "PUBLIC"
+          ? closeTime
+          : null,
 
-        eventName,
-        eventStart,
-        eventEnd,
+      shopName: category === "SHOPPING" ? shopName : null,
+      attractionName: category === "PARK" ? attractionName : null,
 
-        parkingLevel,
-        parkingName,
+      waitMinutes:
+        category === "PARK" || category === "PUBLIC" ? waitMinutes : null,
 
-        flowerPreset,
-        flowerOther,
+      // イベント
+      eventName: category === "EVENT" ? eventName : null,
+      eventStart: category === "EVENT" ? eventStart : null,
+      eventEnd: category === "EVENT" ? eventEnd : null,
 
-        contributorId,
-      },
-    });
+      // 駐車場
+      parkingLevel: category === "PARKING" ? parkingLevel : null,
+      parkingName: category === "PARKING" ? parkingName : null,
+
+      // 花見
+      bloom: category === "HANAMI" ? (bloom as number) : null,
+      flowerPreset: category === "HANAMI" ? flowerPreset : null,
+      flowerOther: category === "HANAMI" ? flowerOther : null,
+
+      contributorId,
+    } as const;
+
+    const created = await prisma.spot.create({ data });
 
     const res = NextResponse.json({ ok: true, item: created });
 
     if (isNew) {
-      // contributorCookieOptions が「オブジェクト」である前提
       res.cookies.set(COOKIE_KEY, contributorId, contributorCookieOptions);
     }
 

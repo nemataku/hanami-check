@@ -13,6 +13,67 @@ function getBadge(total: number, withImg: number) {
   return { label: "ビギナー", color: "bg-neutral-400" };
 }
 
+const CATEGORY_LABEL: Record<string, string> = {
+  SHOPPING: "商業施設",
+  PARK: "公園・テーマパーク",
+  FOOD: "飲食",
+  EVENT: "イベント",
+  PARKING: "駐車場",
+  HANAMI: "花見",
+  SCENIC: "観光地・景勝地",
+  PUBLIC: "公共施設",
+};
+
+const CROWD_LABEL: Record<string, string> = {
+  EMPTY: "空いている",
+  LIGHT: "やや混雑",
+  CROWDED: "混雑",
+  FULL: "満員",
+  RESTRICTED: "入場規制",
+};
+
+const BIZ_LABEL: Record<string, string> = {
+  OPEN: "営業中",
+  BREAK: "休憩中",
+  CLOSED: "営業時間外",
+  HOLIDAY: "休業",
+};
+
+const PARKING_LABEL: Record<string, string> = {
+  AVAILABLE: "空きあり",
+  LIGHT: "やや混雑",
+  CROWDED: "混雑",
+  FULL: "満車",
+};
+
+const BLOOM_LABELS = ["つぼみ", "咲始め", "3分咲き", "5分咲き", "7分咲き", "満開", "散る"] as const;
+function bloomLabel(v: number | null) {
+  if (!Number.isInteger(v ?? NaN)) return "-";
+  return BLOOM_LABELS[v as number] ?? "-";
+}
+
+function formatJST(input: string | Date) {
+  const d = input instanceof Date ? input : new Date(input);
+  if (!Number.isFinite(d.getTime())) return "-";
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(d);
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="rounded-full bg-neutral-100 px-2.5 py-1 text-[11px] font-semibold text-neutral-700 ring-1 ring-neutral-200">
+      {children}
+    </span>
+  );
+}
+
 export default async function MyPage() {
   const { id: contributorId } = await ensureContributorId();
 
@@ -56,26 +117,50 @@ export default async function MyPage() {
       <div className="mt-8 space-y-4">
         <h2 className="text-sm font-bold text-neutral-600">投稿履歴</h2>
 
-        {items.map((s) => (
-          <div key={s.id} className="rounded-xl border bg-white p-4 shadow-sm">
-            <div className="flex justify-between items-start">
-              <p className="font-bold">{s.place}</p>
-              <p className="text-[10px] text-neutral-400">
-                {new Date(s.createdAt).toLocaleDateString("ja-JP")}
-              </p>
+        {items.map((s) => {
+          const cat = String(s.category);
+          const isHanami = cat === "HANAMI";
+
+          return (
+            <div key={s.id} className="rounded-xl border bg-white p-4 shadow-sm">
+              <div className="flex justify-between items-start gap-3">
+                <div className="min-w-0">
+                  <p className="font-bold truncate">{s.place}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Pill>{CATEGORY_LABEL[cat] ?? cat}</Pill>
+
+                    {/* 花見だけ bloom/weather を表示 */}
+                    {isHanami ? (
+                      <>
+                        <Pill>開花：{bloomLabel(s.bloom ?? null)}</Pill>
+                        <Pill>天気：{s.weather ?? "-"}</Pill>
+                        {s.flowerPreset ? <Pill>花：{String(s.flowerPreset)}</Pill> : null}
+                        {s.flowerOther ? <Pill>花：{s.flowerOther}</Pill> : null}
+                      </>
+                    ) : (
+                      <>
+                        {s.crowd ? <Pill>混雑：{CROWD_LABEL[String(s.crowd)] ?? String(s.crowd)}</Pill> : null}
+                        {s.businessStatus ? <Pill>営業：{BIZ_LABEL[String(s.businessStatus)] ?? String(s.businessStatus)}</Pill> : null}
+                        {s.parkingLevel ? <Pill>駐車：{PARKING_LABEL[String(s.parkingLevel)] ?? String(s.parkingLevel)}</Pill> : null}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="shrink-0 text-right">
+                  <p className="text-[10px] text-neutral-400">{formatJST(s.createdAt)}</p>
+                  <p className="mt-1 text-[10px] text-neutral-300">id:{s.id}</p>
+                </div>
+              </div>
+
+              {s.imageUrl ? (
+                <img src={s.imageUrl} className="mt-3 h-32 w-full rounded-lg object-cover" alt="投稿画像" />
+              ) : null}
+
+              {s.comment ? <p className="mt-2 text-sm text-neutral-700 whitespace-pre-wrap">{s.comment}</p> : null}
             </div>
-
-            {s.imageUrl ? (
-              <img
-                src={s.imageUrl}
-                className="mt-2 h-32 w-full rounded-lg object-cover"
-                alt=""
-              />
-            ) : null}
-
-            {s.comment ? <p className="mt-2 text-sm text-neutral-700">{s.comment}</p> : null}
-          </div>
-        ))}
+          );
+        })}
 
         {items.length === 0 ? (
           <p className="text-center text-sm text-neutral-400">履歴がありません</p>

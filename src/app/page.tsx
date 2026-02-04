@@ -12,26 +12,27 @@ export default async function Home({ searchParams }: PageProps) {
   const place = (sp.place ?? "").trim();
   const category = (sp.category ?? "").trim();
 
-  const p = new URLSearchParams();
-  if (place) p.set("place", place);
-  if (category) p.set("category", category);
-  const resultsHref = `/results?${p.toString()}`;
-
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
+      {/* ヘッダー */}
       <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-neutral-200">
-        <h1 className="text-2xl font-bold text-neutral-900">Hanami Check</h1>
-        <p className="mt-1 text-sm text-neutral-600">花見スポットの今がわかる</p>
+        <h1 className="text-2xl font-bold text-neutral-900">Komiru</h1>
+        <p className="mt-1 text-sm text-neutral-600">
+          いまの状況が見える、投稿サイト
+        </p>
       </div>
 
+      {/* カテゴリタブ */}
       <div className="mt-4">
         <CategoryTabs place={place} selected={category} />
       </div>
 
+      {/* 検索フォーム */}
       <section className="mt-4 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-neutral-200">
         <p className="text-xs font-semibold text-neutral-600">場所名で探す</p>
 
-        <form className="mt-3" action="/" method="get">
+        {/* 🔽 /results に GET で送信 */}
+        <form className="mt-3" action="/results" method="get">
           {category ? <input type="hidden" name="category" value={category} /> : null}
 
           <input
@@ -41,28 +42,22 @@ export default async function Home({ searchParams }: PageProps) {
             className="w-full rounded-xl border border-neutral-200 px-3 py-3 text-sm outline-none focus:border-neutral-400"
           />
 
-          <Link
-            href={resultsHref}
+          <button
+            type="submit"
             className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-pink-600 px-4 py-3 text-sm font-semibold text-white hover:bg-pink-700"
           >
             検索する
-          </Link>
+          </button>
         </form>
       </section>
 
-      {/* ✅ 復活：投稿 / マイページ */}
-      <div className="mt-5 grid grid-cols-2 gap-3">
+      {/* 投稿（幅いっぱい） */}
+      <div className="mt-5">
         <Link
           href="/post"
           className="inline-flex w-full items-center justify-center rounded-xl bg-neutral-900 px-4 py-3 text-sm font-semibold text-white hover:bg-neutral-800"
         >
           投稿する
-        </Link>
-        <Link
-          href="/my"
-          className="inline-flex w-full items-center justify-center rounded-xl border border-neutral-200 bg-white px-4 py-3 text-sm font-semibold text-neutral-900 hover:bg-neutral-50"
-        >
-          マイページ
         </Link>
       </div>
     </main>

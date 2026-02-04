@@ -26,6 +26,36 @@ const PARKING_4 = ["空きあり", "やや混雑", "混雑", "満車"] as const;
 const BUSINESS_STATUS = ["営業中", "休憩中", "営業時間外", "休業"] as const;
 const PARK_STATUS = ["営業中", "営業時間外", "休業"] as const;
 
+// ===== API送信用コード変換 =====
+
+const CROWD_CODE = {
+  空いている: "EMPTY",
+  やや混雑: "LIGHT",
+  混雑: "CROWDED",
+  満員: "FULL",
+  入場規制: "RESTRICTED",
+} as const;
+
+const BUSINESS_CODE = {
+  営業中: "OPEN",
+  休憩中: "BREAK",
+  営業時間外: "CLOSED",
+  休業: "HOLIDAY",
+} as const;
+
+const PARKING_CODE = {
+  空きあり: "AVAILABLE",
+  やや混雑: "LIGHT",
+  混雑: "CROWDED",
+  満車: "FULL",
+} as const;
+
+const PARK_STATUS_TO_ENUM = {
+  営業中: "OPEN",
+  営業時間外: "CLOSED",
+  休業: "HOLIDAY",
+} as const;
+
 type UploadResult =
   | { ok: true; imageUrl: string; imageHash: string; bytes: number }
   | { ok: false; error: string };
@@ -45,6 +75,114 @@ function pill(active: boolean) {
 
 function badgeTone() {
   return "bg-neutral-100 text-neutral-700 ring-neutral-200";
+}
+
+function toNumberOrNull(v: string) {
+  const s = v.trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// ===== 追加：time入力の正規化（HH:mm 以外は弾く）=====
+function normalizeHHMMInput(v: string) {
+  const s = (v ?? "").trim();
+  if (!s) return "";
+  if (!/^\d{2}:\d{2}$/.test(s)) return "";
+  const [hh, mm] = s.split(":").map(Number);
+  if (hh < 0 || hh > 23) return "";
+  if (mm < 0 || mm > 59) return "";
+  return s;
+}
+
+// ===== 追加：30分刻みの候補（datalist用）=====
+const TIME_30_OPTIONS = (() => {
+  const out: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      const hh = String(h).padStart(2, "0");
+      const mm = String(m).padStart(2, "0");
+      out.push(`${hh}:${mm}`);
+    }
+  }
+  return out;
+})();
+
+function TimeOptionDatalist({ id }: { id: string }) {
+  return (
+    <datalist id={id}>
+      {TIME_30_OPTIONS.map((t) => (
+        <option key={t} value={t} />
+      ))}
+    </datalist>
+  );
+}
+
+function TimeRangePicker(props: {
+  title: string;
+  required?: boolean;
+  start: string;
+  end: string;
+  onStart: (v: string) => void;
+  onEnd: (v: string) => void;
+  datalistId: string;
+  helper?: string;
+}) {
+  const { title, required, start, end, onStart, onEnd, datalistId, helper } = props;
+
+  return (
+    <section className="rounded-2xl border border-neutral-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
+        <label className="text-sm font-semibold text-neutral-900">
+          {title}
+          {required ? "（必須）" : "（任意）"}
+        </label>
+        <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
+          {start && end ? `${start} - ${end}` : "未入力"}
+        </span>
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <div>
+          <p className="text-xs font-medium text-neutral-600">開始</p>
+          <input
+            type="time"
+            step={1800} // 30分
+            list={datalistId}
+            value={start}
+            onChange={(e) => onStart(normalizeHHMMInput(e.target.value))}
+            className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+          />
+        </div>
+
+        <div>
+          <p className="text-xs font-medium text-neutral-600">終了</p>
+          <input
+            type="time"
+            step={1800} // 30分
+            list={datalistId}
+            value={end}
+            onChange={(e) => onEnd(normalizeHHMMInput(e.target.value))}
+            className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-neutral-400"
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between">
+        {helper ? <p className="text-[11px] text-neutral-500">{helper}</p> : <span />}
+        <button
+          type="button"
+          onClick={() => {
+            onStart("");
+            onEnd("");
+          }}
+          className="text-xs font-semibold text-neutral-700 hover:text-neutral-900"
+        >
+          クリア
+        </button>
+      </div>
+    </section>
+  );
 }
 
 export default function SpotForm() {
@@ -80,14 +218,10 @@ export default function SpotForm() {
   const [flowerPresetLabel, setFlowerPresetLabel] = useState<FlowerPresetLabel | "">("");
   const [flowerOther, setFlowerOther] = useState("");
 
-  // ✅ 1回だけ定義
   const flowerPreset = flowerPresetLabel ? FLOWER_CODE[flowerPresetLabel] : null;
 
-  // ✅ “その他”選択時のみ有効
   const flowerOtherValue =
-    flowerPresetLabel === "その他" && flowerOther.trim() !== ""
-      ? flowerOther.trim()
-      : null;
+    flowerPresetLabel === "その他" && flowerOther.trim() !== "" ? flowerOther.trim() : null;
 
   // 混雑（多カテゴリで使う）
   const [crowd5, setCrowd5] = useState<(typeof CROWD_5)[number] | "">("");
@@ -98,28 +232,39 @@ export default function SpotForm() {
   // 商業施設
   const [shopName, setShopName] = useState("");
   const [businessStatus, setBusinessStatus] = useState<(typeof BUSINESS_STATUS)[number] | "">("");
-  const [openTime, setOpenTime] = useState(""); // "09:00"
-  const [closeTime, setCloseTime] = useState(""); // "18:00"
+  const [shopOpen, setShopOpen] = useState("");
+  const [shopClose, setShopClose] = useState("");
 
   // 公園・テーマパーク
   const [attractionName, setAttractionName] = useState("");
-  const [waitMinutes, setWaitMinutes] = useState(""); // number string
+  const [waitMinutes, setWaitMinutes] = useState("");
   const [parkStatus, setParkStatus] = useState<(typeof PARK_STATUS)[number] | "">("");
+  const [parkOpen, setParkOpen] = useState("");
+  const [parkClose, setParkClose] = useState("");
 
-  // 飲食
+  // 飲食（★ここが追加）
   const [foodStatus, setFoodStatus] = useState<(typeof BUSINESS_STATUS)[number] | "">("");
   const [foodOpen, setFoodOpen] = useState("");
   const [foodClose, setFoodClose] = useState("");
 
   // イベント
   const [eventName, setEventName] = useState("");
-  const [eventStart, setEventStart] = useState(""); // "HH:mm"
+  const [eventStart, setEventStart] = useState("");
   const [eventEnd, setEventEnd] = useState("");
 
+  // 駐車場名（任意）
+  const [parkingName, setParkingName] = useState("");
+  const [parkingOpen, setParkingOpen] = useState("");
+  const [parkingClose, setParkingClose] = useState("");
+
+  // 観光地・景勝地
+  const [scenicOpen, setScenicOpen] = useState("");
+  const [scenicClose, setScenicClose] = useState("");
+
   // 公共施設
+  const [publicWait, setPublicWait] = useState("");
   const [publicOpen, setPublicOpen] = useState("");
   const [publicClose, setPublicClose] = useState("");
-  const [publicWait, setPublicWait] = useState("");
 
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -217,42 +362,60 @@ export default function SpotForm() {
     }
   }, [category]);
 
+  // 天気が必須のカテゴリだけ true
+  const isWeatherRequired = useMemo(() => {
+    return category === "PARK" || category === "HANAMI" || category === "SCENIC" || category === "PUBLIC";
+  }, [category]);
+
   const canSubmit = useMemo(() => {
     if (!category) return false;
     if (!place.trim()) return false;
     if (uploading || submitting) return false;
     if (file && !imageUrl) return false;
 
-    // カテゴリ別必須
+    if (isWeatherRequired && weather === "") return false;
+
     if (category === "SHOPPING") {
       if (businessStatus === "") return false;
       if (crowd5 === "") return false;
     }
+
     if (category === "PARK") {
-      if (crowd5 === "") return false;
       if (parkStatus === "") return false;
-    }
-    if (category === "FOOD") {
+      if (weather === "") return false;
       if (crowd5 === "") return false;
-      if (foodStatus === "") return false;
     }
+
+    if (category === "FOOD") {
+      if (foodStatus === "") return false;
+      if (crowd5 === "") return false;
+    }
+
     if (category === "EVENT") {
       if (!eventName.trim()) return false;
+      if (eventStart === "" || eventEnd === "") return false;
       if (crowd5 === "") return false;
     }
+
     if (category === "PARKING") {
       if (parking4 === "") return false;
     }
+
     if (category === "HANAMI") {
       if (!Number.isInteger(bloom) || bloom < 0 || bloom > 6) return false;
+      if (weather === "") return false;
       if (crowd5 === "") return false;
       if (!flowerPreset && !flowerOtherValue) return false;
       if (flowerPresetLabel === "その他" && !flowerOtherValue) return false;
     }
+
     if (category === "SCENIC") {
+      if (weather === "") return false;
       if (crowd5 === "") return false;
     }
+
     if (category === "PUBLIC") {
+      if (weather === "") return false;
       if (crowd5 === "") return false;
     }
 
@@ -264,11 +427,15 @@ export default function SpotForm() {
     submitting,
     file,
     imageUrl,
+    isWeatherRequired,
+    weather,
     businessStatus,
     crowd5,
     parkStatus,
     foodStatus,
     eventName,
+    eventStart,
+    eventEnd,
     parking4,
     bloom,
     flowerPreset,
@@ -284,19 +451,31 @@ export default function SpotForm() {
       setFormError("カテゴリを選択してください");
       return;
     }
+
     const placeTrim = place.trim();
     if (!placeTrim) {
       setFormError("場所名を入力してください");
       return;
     }
+
     if (file && !imageUrl) {
       setFormError("画像アップロードが完了していません");
       return;
     }
 
+    if (isWeatherRequired && weather === "") {
+      setFormError("天気を選択してください");
+      return;
+    }
+
+    if (category === "EVENT" && (eventStart === "" || eventEnd === "")) {
+      setFormError("イベント時間を入力してください");
+      return;
+    }
+
     if (category === "HANAMI") {
       if (!flowerPreset && !flowerOtherValue) {
-        setFormError("花の種類（桜/梅/その他 or 自由記入）が必須です");
+        setFormError("花の種類（桜/梅/その他）が必須です");
         return;
       }
       if (flowerPresetLabel === "その他" && !flowerOtherValue) {
@@ -317,59 +496,65 @@ export default function SpotForm() {
 
       if (category === "SHOPPING") {
         payload.shopName = shopName.trim() === "" ? null : shopName.trim();
-        payload.businessStatus = businessStatus;
-        payload.openTime = openTime || null;
-        payload.closeTime = closeTime || null;
-        payload.crowd = crowd5;
+        payload.businessStatus = businessStatus === "" ? null : BUSINESS_CODE[businessStatus];
+        payload.openTime = shopOpen === "" ? null : shopOpen;
+        payload.closeTime = shopClose === "" ? null : shopClose;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
       }
 
       if (category === "PARK") {
         payload.attractionName = attractionName.trim() === "" ? null : attractionName.trim();
-        payload.crowd = crowd5;
-        payload.waitMinutes = waitMinutes.trim() === "" ? null : Number(waitMinutes);
-        payload.businessStatus = parkStatus; // parkも businessStatus として送る
-        payload.openTime = openTime || null;
-        payload.closeTime = closeTime || null;
-        payload.weather = weather === "" ? null : weather;
+        payload.waitMinutes = toNumberOrNull(waitMinutes);
+        payload.businessStatus = parkStatus === "" ? null : PARK_STATUS_TO_ENUM[parkStatus];
+        payload.openTime = parkOpen === "" ? null : parkOpen;
+        payload.closeTime = parkClose === "" ? null : parkClose;
+        payload.weather = weather;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
       }
 
+      // ★FOOD：時間を追加（openTime/closeTime に保存）
       if (category === "FOOD") {
-        payload.crowd = crowd5;
-        payload.businessStatus = foodStatus;
-        payload.openTime = foodOpen || null;
-        payload.closeTime = foodClose || null;
+        payload.businessStatus = foodStatus === "" ? null : BUSINESS_CODE[foodStatus];
+        payload.openTime = foodOpen === "" ? null : foodOpen;
+        payload.closeTime = foodClose === "" ? null : foodClose;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
       }
 
       if (category === "EVENT") {
         payload.eventName = eventName.trim();
-        payload.crowd = crowd5;
-        payload.eventStart = eventStart || null;
-        payload.eventEnd = eventEnd || null;
+        payload.eventStart = eventStart;
+        payload.eventEnd = eventEnd;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
       }
 
       if (category === "PARKING") {
-        payload.parkingName = shopName.trim() === "" ? null : shopName.trim();
-        payload.parkingLevel = parking4;
+        payload.parkingName = parkingName.trim() === "" ? null : parkingName.trim();
+        payload.parkingLevel = parking4 === "" ? null : PARKING_CODE[parking4];
+        payload.openTime = parkingOpen === "" ? null : parkingOpen;
+        payload.closeTime = parkingClose === "" ? null : parkingClose;
       }
 
       if (category === "HANAMI") {
-        payload.bloom = bloom;
-        payload.weather = weather === "" ? null : weather;
-        payload.crowd = crowd5;
         payload.flowerPreset = flowerPreset;
         payload.flowerOther = flowerOtherValue;
+        payload.bloom = bloom;
+        payload.weather = weather;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
       }
 
       if (category === "SCENIC") {
-        payload.crowd = crowd5;
-        payload.weather = weather === "" ? null : weather;
+        payload.weather = weather;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
+        payload.openTime = scenicOpen === "" ? null : scenicOpen;
+        payload.closeTime = scenicClose === "" ? null : scenicClose;
       }
 
       if (category === "PUBLIC") {
-        payload.crowd = crowd5;
-        payload.openTime = publicOpen || null;
-        payload.closeTime = publicClose || null;
-        payload.waitMinutes = publicWait.trim() === "" ? null : Number(publicWait);
+        payload.openTime = publicOpen === "" ? null : publicOpen;
+        payload.closeTime = publicClose === "" ? null : publicClose;
+        payload.waitMinutes = toNumberOrNull(publicWait);
+        payload.weather = weather;
+        payload.crowd = crowd5 === "" ? null : CROWD_CODE[crowd5];
       }
 
       const res = await fetch("/api/spots", {
@@ -390,31 +575,50 @@ export default function SpotForm() {
       }
 
       setOkMsg("投稿しました");
+
+      // reset
       setComment("");
       setPlace("");
       setCategory(null);
+
       setCrowd5("");
       setParking4("");
+
       setShopName("");
       setBusinessStatus("");
-      setOpenTime("");
-      setCloseTime("");
+      setShopOpen("");
+      setShopClose("");
+
       setAttractionName("");
       setWaitMinutes("");
       setParkStatus("");
+      setParkOpen("");
+      setParkClose("");
+
       setFoodStatus("");
       setFoodOpen("");
       setFoodClose("");
+
       setEventName("");
       setEventStart("");
       setEventEnd("");
+
+      setParkingName("");
+      setParkingOpen("");
+      setParkingClose("");
+
+      setScenicOpen("");
+      setScenicClose("");
+
       setPublicOpen("");
       setPublicClose("");
       setPublicWait("");
+
       setBloom(3);
       setWeather("");
       setFlowerPresetLabel("");
       setFlowerOther("");
+
       clearFileSelection();
     } catch (e) {
       console.error(e);
@@ -424,8 +628,13 @@ export default function SpotForm() {
     }
   }
 
+  const TIME_DATALIST_ID = "time-30min";
+
   return (
     <main className="mx-auto w-full max-w-md px-4 py-8">
+      {/* datalist（30分刻み候補） */}
+      <TimeOptionDatalist id={TIME_DATALIST_ID} />
+
       <div className="rounded-2xl bg-pink-50 p-4 ring-1 ring-pink-100">
         <p className="text-xs font-medium text-pink-700">投稿</p>
         <h1 className="mt-1 text-xl font-semibold text-neutral-900">いまの状況を投稿</h1>
@@ -437,12 +646,7 @@ export default function SpotForm() {
         <label className="text-sm font-semibold text-neutral-900">カテゴリ（必須）</label>
         <div className="mt-3 flex flex-wrap gap-2">
           {CATEGORIES.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              onClick={() => setCategory(c.key)}
-              className={pill(category === c.key)}
-            >
+            <button key={c.key} type="button" onClick={() => setCategory(c.key)} className={pill(category === c.key)}>
               {c.label}
             </button>
           ))}
@@ -486,13 +690,15 @@ export default function SpotForm() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-            </div>
-          </section>
+          <TimeRangePicker
+            title="営業時間"
+            start={shopOpen}
+            end={shopClose}
+            onStart={setShopOpen}
+            onEnd={setShopClose}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between">
@@ -547,25 +753,24 @@ export default function SpotForm() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={openTime} onChange={(e) => setOpenTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={closeTime} onChange={(e) => setCloseTime(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-            </div>
-          </section>
+          <TimeRangePicker
+            title="営業時間"
+            start={parkOpen}
+            end={parkClose}
+            onStart={setParkOpen}
+            onEnd={setParkClose}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-neutral-900">天気（任意）</label>
+              <label className="text-sm font-semibold text-neutral-900">天気（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
                 {weather === "" ? "-" : weather}
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => setWeather("")} className={pill(weather === "")}>
-                未選択
-              </button>
               {WEATHER_OPTIONS.map((w) => (
                 <button key={w} type="button" onClick={() => setWeather(w)} className={pill(weather === w)}>
                   {w}
@@ -592,7 +797,7 @@ export default function SpotForm() {
         </div>
       ) : null}
 
-      {/* 飲食 */}
+      {/* 飲食（★時間入力を追加） */}
       {category === "FOOD" ? (
         <div className="mt-4 space-y-4">
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -606,13 +811,15 @@ export default function SpotForm() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={foodOpen} onChange={(e) => setFoodOpen(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={foodClose} onChange={(e) => setFoodClose(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-            </div>
-          </section>
+          <TimeRangePicker
+            title="営業時間"
+            start={foodOpen}
+            end={foodClose}
+            onStart={setFoodOpen}
+            onEnd={setFoodClose}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between">
@@ -645,13 +852,16 @@ export default function SpotForm() {
             />
           </section>
 
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">イベント時間（任意）</label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={eventStart} onChange={(e) => setEventStart(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={eventEnd} onChange={(e) => setEventEnd(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-            </div>
-          </section>
+          <TimeRangePicker
+            title="イベント時間"
+            required
+            start={eventStart}
+            end={eventEnd}
+            onStart={setEventStart}
+            onEnd={setEventEnd}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between">
@@ -677,16 +887,26 @@ export default function SpotForm() {
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <label className="text-sm font-semibold text-neutral-900">駐車場名（任意）</label>
             <input
-              value={shopName}
-              onChange={(e) => setShopName(e.target.value)}
+              value={parkingName}
+              onChange={(e) => setParkingName(e.target.value)}
               className="mt-2 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm"
               placeholder="例：第1駐車場"
             />
           </section>
 
+          <TimeRangePicker
+            title="時間"
+            start={parkingOpen}
+            end={parkingClose}
+            onStart={setParkingOpen}
+            onEnd={setParkingClose}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
+
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold text-neutral-900">混雑具合（必須）</label>
+              <label className="text-sm font-semibold text-neutral-900">混雑状況（必須）</label>
               <span className={["rounded-full px-2.5 py-1 text-xs font-medium ring-1", badgeTone()].join(" ")}>
                 {parking4 === "" ? "-" : parking4}
               </span>
@@ -728,9 +948,7 @@ export default function SpotForm() {
               />
             ) : null}
 
-            <p className="mt-2 text-xs text-neutral-500">
-              ※「桜」「梅」ボタン、または「その他」を選んで入力してください
-            </p>
+            <p className="mt-2 text-xs text-neutral-500">※「桜」「梅」ボタン、または「その他」を選んで入力してください</p>
           </section>
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
@@ -745,11 +963,8 @@ export default function SpotForm() {
           </section>
 
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">天気（任意）</label>
+            <label className="text-sm font-semibold text-neutral-900">天気（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => setWeather("")} className={pill(weather === "")}>
-                未選択
-              </button>
               {WEATHER_OPTIONS.map((w) => (
                 <button key={w} type="button" onClick={() => setWeather(w)} className={pill(weather === w)}>
                   {w}
@@ -774,12 +989,19 @@ export default function SpotForm() {
       {/* 観光地・景勝地 */}
       {category === "SCENIC" ? (
         <div className="mt-4 space-y-4">
+          <TimeRangePicker
+            title="時間"
+            start={scenicOpen}
+            end={scenicClose}
+            onStart={setScenicOpen}
+            onEnd={setScenicClose}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
+
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">天気（任意）</label>
+            <label className="text-sm font-semibold text-neutral-900">天気（必須）</label>
             <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" onClick={() => setWeather("")} className={pill(weather === "")}>
-                未選択
-              </button>
               {WEATHER_OPTIONS.map((w) => (
                 <button key={w} type="button" onClick={() => setWeather(w)} className={pill(weather === w)}>
                   {w}
@@ -804,11 +1026,24 @@ export default function SpotForm() {
       {/* 公共施設 */}
       {category === "PUBLIC" ? (
         <div className="mt-4 space-y-4">
+          <TimeRangePicker
+            title="営業時間"
+            start={publicOpen}
+            end={publicClose}
+            onStart={setPublicOpen}
+            onEnd={setPublicClose}
+            datalistId={TIME_DATALIST_ID}
+            helper="※30分刻み候補を表示（その他の時刻も入力可）"
+          />
+
           <section className="rounded-2xl border border-neutral-200 bg-white p-4">
-            <label className="text-sm font-semibold text-neutral-900">営業時間（任意）</label>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <input type="time" value={publicOpen} onChange={(e) => setPublicOpen(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
-              <input type="time" value={publicClose} onChange={(e) => setPublicClose(e.target.value)} className="rounded-xl border border-neutral-200 px-3 py-2 text-sm" />
+            <label className="text-sm font-semibold text-neutral-900">天気（必須）</label>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {WEATHER_OPTIONS.map((w) => (
+                <button key={w} type="button" onClick={() => setWeather(w)} className={pill(weather === w)}>
+                  {w}
+                </button>
+              ))}
             </div>
           </section>
 

@@ -4,8 +4,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Hanami Check",
-  description: "いま行くべき花見スポットを、投稿ベースで判断。",
+  title: "Komiru",
+  description: "いまの状況が見える、投稿ベースのリアルタイム情報サービス。",
   verification: {
     // ✅ Search Console の「HTMLタグ」方式で出てくる
     // <meta name="google-site-verification" content="XXXX" />
@@ -36,7 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </nav>
 
               <p className="mt-4 text-center text-xs text-neutral-400">
-                © {new Date().getFullYear()} Hanami Check
+                © {new Date().getFullYear()} Komiru
               </p>
             </div>
           </footer>

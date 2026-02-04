@@ -22,18 +22,18 @@ enum Category {
 }
 
 enum CrowdLevel {
-  EMPTY        // 空いている
-  LIGHT        // やや混雑
-  CROWDED      // 混雑
-  FULL         // 満員
-  RESTRICTED   // 入場規制
+  EMPTY      // 空いている
+  LIGHT      // やや混雑
+  CROWDED    // 混雑
+  FULL       // 満員
+  RESTRICTED // 入場規制
 }
 
 enum ParkingLevel {
-  AVAILABLE    // 空きあり
-  LIGHT        // やや混雑
-  CROWDED      // 混雑
-  FULL         // 満車
+  AVAILABLE // 空きあり
+  LIGHT     // やや混雑
+  CROWDED   // 混雑
+  FULL      // 満車
 }
 
 enum BusinessStatus {
@@ -56,52 +56,55 @@ model Contributor {
 }
 
 model Spot {
-  id            Int          @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
 
   // 共通
-  category      Category     @default(HANAMI)
-  place         String
+  category  Category @default(HANAMI)
+  place     String
 
-  // 花見（既存）
-  bloom         Int?         // 0..6（花見のみ必須扱い）
-  weather       String?
+  // 共通（追加：PUBLIC/SCENIC/HANAMI/PARK で必須運用）
+  // ※ enum化しても良いが、現状フロントが String を送っているので合わせる
+  weather   String?
 
   // 共通（既存）
-  comment       String?
-  imageUrl      String?
-  imageHash     String?
+  comment   String?
+  imageUrl  String?
+  imageHash String?
 
   // 混雑（多くのカテゴリで使用）
-  crowd         CrowdLevel?
+  crowd     CrowdLevel?
 
   // 駐車場
-  parkingLevel  ParkingLevel?
-  parkingName   String?
+  parkingLevel ParkingLevel?
+  parkingName  String?
 
-  // 商業施設 / 飲食 / 公園
-  shopName        String?
-  attractionName  String?
-  businessStatus  BusinessStatus?
-  openTime        String?   // "HH:mm"
-  closeTime       String?   // "HH:mm"
+  // 商業施設 / 飲食
+  shopName       String?
+  businessStatus BusinessStatus?
+  openTime       String? // "HH:mm"
+  closeTime      String? // "HH:mm"
+
+  // 公園・テーマパーク
+  attractionName String?
 
   // 待ち時間（公園・公共施設）
-  waitMinutes   Int?
+  waitMinutes Int?
 
   // イベント
-  eventName     String?
-  eventStart    String?     // "HH:mm"
-  eventEnd      String?     // "HH:mm"
+  eventName  String?
+  eventStart String? // "HH:mm"
+  eventEnd   String? // "HH:mm"
 
-  // 花見：花の種類
-  flowerPreset  FlowerPreset?
-  flowerOther   String?
+  // 花見
+  bloom        Int? // 0..6（花見のみ必須扱い）
+  flowerPreset FlowerPreset?
+  flowerOther  String?
 
   // 投稿者
   contributorId String?
   contributor   Contributor? @relation(fields: [contributorId], references: [id])
 
-  createdAt     DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@index([place])
   @@index([category])
